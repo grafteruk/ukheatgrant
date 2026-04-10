@@ -133,7 +133,7 @@
       <div class="fact"><div class="fact-icon">💷</div><div><h4>Up to £7,500 available</h4><p>Air source heat pumps qualify for the full £7,500 grant amount.</p></div></div>
       <div class="fact"><div class="fact-icon">🏠</div><div><h4>England & Wales only</h4><p>The Boiler Upgrade Scheme currently applies to properties in England and Wales.</p></div></div>
       <div class="fact"><div class="fact-icon">✅</div><div><h4>No paperwork for you</h4><p>Your MCS certified installer handles the grant application on your behalf.</p></div></div>
-      <div class="fact"><div class="fact-icon">⚡</div><div><h4>Lower energy bills</h4><p>Heat pumps can reduce heating bills by up to £500 a year compared to a gas boiler.</p></div></div>
+      <div class="fact"><div class="fact-icon">⚡</div><div><h4>Lower energy bills</h4><p>Heat pumps can reduce heating bills by hundreds per year compared to older systems.</p></div></div>
     </div>
   </div>
 </section>
@@ -181,10 +181,10 @@
           <div class="form-group"><label>Last Name</label><input type="text" name="last_name" placeholder="Smith" required /></div>
         </div>
         <div class="form-group"><label>Email Address</label><input type="email" name="email" placeholder="john@example.com" required /></div>
-        <div class="form-group"><label>Phone Number</label><input type="tel" name="phone" placeholder="07700 900000" required /></div>
+        <div class="form-group"><label>Phone Number</label><input type="tel" name="phone" placeholder="07700 900000" pattern="[0-9\s]{10,11}" title="Please enter a valid UK phone number (10-11 digits)" required /></div>
         <div class="form-group"><label>Postcode</label><input type="text" name="postcode" placeholder="AL1 1AA" required /></div>
         <div class="form-group"><label>Current Heating System</label><select name="heating_system" required><option value="">Select your heating type</option><option>Gas Boiler</option><option>Oil Boiler</option><option>Electric Heating</option><option>LPG Boiler</option><option>Other</option></select></div>
-        <div class="form-group"><label>Property Type</label><select name="property_type" required><option value="">Select property type</option><option>Detached House</option><option>Semi-Detached House</option><option>Terraced House</option><option>Bungalow</option><option>Flat / Apartment</option></select></div>
+        <div class="form-group"><label>Property Type</label><select name="property_type" required><option value="">Select property type</option><option>Detached House</option><option>Semi-Detached House</option><option>Terraced House</option><option>Bungalow</option></select></div>
         <div class="form-group"><label>Do you own the property?</label><select name="property_owned" required><option value="">Please select</option><option>Yes, I own it</option><option>No, I rent</option></select></div>
         <p style="background:#FFF8E7; border:1px solid #FFE082; border-radius:8px; padding:0.8rem 1rem; font-size:0.82rem; color:#7A5800; margin-bottom:1rem; text-align:center;">⚠️ Funding is limited and allocated on a first come, first served basis. Check your eligibility today.</p>
         <button type="submit" class="form-submit">Check If I Qualify For £7,500 →</button>
@@ -199,14 +199,12 @@
   </div>
 </section>
 <footer>
-  <p>© 2026 UK Heat Pump Grant · <a href="mailto:info@ukheatpumpgrant.co.uk">info@ukheatpumpgrant.co.uk</a> · This site is not affiliated with the UK Government. We connect homeowners with MCS certified installers.</p>
+  <p>© 2026 UK Heat Pump Grant · info@ukheatpumpgrant.co.uk · This site is not affiliated with the UK Government. We connect homeowners with MCS certified installers.</p>
 </footer>
 <script>
 function gtag_report_conversion(url) {
   var callback = function () {
-    if (typeof(url) != 'undefined') {
-      window.location = url;
-    }
+    if (typeof(url) != 'undefined') { window.location = url; }
   };
   gtag('event', 'conversion', {
     'send_to': 'AW-18066229023/GOAHCMHB15YcEJ-Q06ZD',
