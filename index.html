@@ -77,10 +77,37 @@
     .form-submit { width: 100%; background: var(--green); color: var(--white); font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 1rem; padding: 1rem; border: none; border-radius: 8px; cursor: pointer; margin-top: 0.5rem; }
     .form-submit:hover { background: var(--green-light); }
     .form-note { text-align: center; font-size: 0.78rem; color: var(--text-muted); margin-top: 1rem; line-height: 1.5; }
-    .success-msg { display: none; text-align: center; padding: 2rem; }
-    .success-msg .tick-big { width: 60px; height: 60px; background: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--white); margin: 0 auto 1rem; }
-    .success-msg h3 { font-family: 'DM Serif Display', serif; font-size: 1.5rem; color: var(--text); margin-bottom: 0.5rem; }
-    .success-msg p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
+    .progress { height: 6px; background: var(--green-pale); border-radius: 3px; margin-bottom: 1.5rem; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--green-light); width: 0%; transition: width 0.35s ease; border-radius: 3px; }
+    .quiz-step { display: none; }
+    .quiz-step.active { display: block; animation: quizFade 0.25s ease; }
+    @keyframes quizFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .quiz-q { font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: var(--text); margin-bottom: 0.4rem; line-height: 1.25; }
+    .quiz-sub { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.4rem; line-height: 1.5; }
+    .option-btn { display: block; width: 100%; padding: 1rem 1.25rem; margin-bottom: 0.7rem; background: var(--off-white); border: 1.5px solid var(--border); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; font-weight: 500; color: var(--text); text-align: left; cursor: pointer; transition: border-color 0.15s, background 0.15s, transform 0.1s; }
+    .option-btn:hover, .option-btn:focus-visible { border-color: var(--green); background: var(--green-pale); outline: none; }
+    .option-btn:active { transform: scale(0.99); }
+    .back-btn { background: none; border: none; color: var(--text-muted); font-size: 0.85rem; cursor: pointer; padding: 0.3rem 0; margin-bottom: 0.6rem; font-family: inherit; display: inline-flex; align-items: center; gap: 0.3rem; }
+    .back-btn:hover { color: var(--green); }
+    .exit-screen { text-align: center; padding: 0.5rem; }
+    .exit-icon { width: 56px; height: 56px; background: #FFF3E0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 1.2rem; }
+    .exit-screen h3 { font-family: 'DM Serif Display', serif; font-size: 1.3rem; margin-bottom: 0.6rem; color: var(--text); line-height: 1.25; }
+    .exit-screen p { font-size: 0.92rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 0.5rem; }
+    .exit-email { margin-top: 1.4rem; padding-top: 1.4rem; border-top: 1px solid var(--border); text-align: left; }
+    .exit-email label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-mid); margin-bottom: 0.4rem; }
+    .exit-email input { width: 100%; padding: 0.75rem 1rem; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.9rem; font-family: inherit; background: var(--off-white); margin-bottom: 0.8rem; }
+    .confirm-screen { text-align: center; }
+    .confirm-screen .tick-big { width: 64px; height: 64px; background: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; color: var(--white); margin: 0 auto 1.2rem; }
+    .confirm-screen h3 { font-family: 'DM Serif Display', serif; font-size: 1.5rem; margin-bottom: 0.6rem; color: var(--text); line-height: 1.25; }
+    .confirm-screen .confirm-lead { font-size: 0.95rem; color: var(--text-mid); line-height: 1.6; margin-bottom: 1.5rem; }
+    .next-steps { text-align: left; background: var(--green-pale); border: 1px solid var(--green-mid); border-radius: 10px; padding: 1.2rem 1.4rem; }
+    .next-steps h4 { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--green); margin-bottom: 0.9rem; }
+    .next-steps ul { list-style: none; }
+    .next-steps li { font-size: 0.88rem; color: var(--text-mid); line-height: 1.5; margin-bottom: 0.7rem; padding-left: 1.4rem; position: relative; }
+    .next-steps li::before { content: '→'; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+    .next-steps li:last-child { margin-bottom: 0; }
+    .form-err { background: #FEECEC; border: 1px solid #F5B5B5; color: #8A1F1F; padding: 0.7rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; display: none; line-height: 1.45; }
+    .form-err.show { display: block; }
     footer { background: #0F3D25; padding: 2rem; text-align: center; }
     footer p { color: rgba(255,255,255,0.4); font-size: 0.82rem; }
     footer a { color: rgba(255,255,255,0.5); text-decoration: none; }
@@ -172,28 +199,146 @@
       </div>
     </div>
     <div class="form-card">
-      <form id="lead-form" onsubmit="submitForm(event)">
-        <input type="hidden" name="access_key" value="612f0ea2-5df6-4f01-9ba0-96e059f0728e" />
-        <input type="hidden" name="subject" value="New Heat Pump Grant Enquiry" />
-        <input type="hidden" name="from_name" value="UK Heat Pump Grant" />
-        <div class="form-row">
-          <div class="form-group"><label>First Name</label><input type="text" name="first_name" placeholder="John" required /></div>
-          <div class="form-group"><label>Last Name</label><input type="text" name="last_name" placeholder="Smith" required /></div>
+      <div class="progress" id="progressWrap"><div class="progress-fill" id="progressFill"></div></div>
+
+      <div class="quiz-step active" data-step="1">
+        <h3 class="quiz-q">Do you own your home?</h3>
+        <p class="quiz-sub">The Boiler Upgrade Scheme is only available to homeowners.</p>
+        <button type="button" class="option-btn" data-answer="yes">Yes, I own my home</button>
+        <button type="button" class="option-btn" data-answer="no">No, I rent</button>
+      </div>
+
+      <div class="quiz-step" data-step="2">
+        <button type="button" class="back-btn">← Back</button>
+        <h3 class="quiz-q">Is your property in England or Wales?</h3>
+        <p class="quiz-sub">The grant currently covers England and Wales only.</p>
+        <button type="button" class="option-btn" data-answer="yes">Yes, England or Wales</button>
+        <button type="button" class="option-btn" data-answer="no">No (Scotland or Northern Ireland)</button>
+      </div>
+
+      <div class="quiz-step" data-step="3">
+        <button type="button" class="back-btn">← Back</button>
+        <h3 class="quiz-q">What's your current heating system?</h3>
+        <p class="quiz-sub">Pick the one that best describes how you heat your home today.</p>
+        <button type="button" class="option-btn" data-answer="gas">Gas boiler</button>
+        <button type="button" class="option-btn" data-answer="oil">Oil boiler</button>
+        <button type="button" class="option-btn" data-answer="lpg">LPG boiler</button>
+        <button type="button" class="option-btn" data-answer="electric">Electric heating</button>
+        <button type="button" class="option-btn" data-answer="heat-pump">I already have a heat pump</button>
+      </div>
+
+      <div class="quiz-step" data-step="4">
+        <button type="button" class="back-btn">← Back</button>
+        <h3 class="quiz-q">What type of property do you live in?</h3>
+        <p class="quiz-sub">This helps us match you with the right installer.</p>
+        <button type="button" class="option-btn" data-answer="detached">Detached house</button>
+        <button type="button" class="option-btn" data-answer="semi-detached">Semi-detached house</button>
+        <button type="button" class="option-btn" data-answer="terraced">Terraced house</button>
+        <button type="button" class="option-btn" data-answer="bungalow">Bungalow</button>
+      </div>
+
+      <div class="quiz-step" data-step="5">
+        <button type="button" class="back-btn">← Back</button>
+        <h3 class="quiz-q">When are you looking to install?</h3>
+        <p class="quiz-sub">Installers prioritise quotes based on timeline.</p>
+        <button type="button" class="option-btn" data-answer="within-3-months">Within 3 months</button>
+        <button type="button" class="option-btn" data-answer="3-6-months">3–6 months</button>
+        <button type="button" class="option-btn" data-answer="6-12-months">6–12 months</button>
+        <button type="button" class="option-btn" data-answer="researching">Just researching</button>
+      </div>
+
+      <div class="quiz-step" data-step="6">
+        <button type="button" class="back-btn">← Back</button>
+        <h3 class="quiz-q">What's your postcode?</h3>
+        <p class="quiz-sub">We'll match you with a certified installer in your area.</p>
+        <div class="form-group"><input type="text" id="postcodeInput" placeholder="e.g. AL1 1AA" autocomplete="postal-code" autocapitalize="characters" /></div>
+        <div class="form-err" id="postcodeErr">Please enter a valid UK postcode.</div>
+        <button type="button" class="form-submit" id="postcodeNext">Continue →</button>
+      </div>
+
+      <div class="quiz-step" data-step="7">
+        <button type="button" class="back-btn">← Back</button>
+        <h3 class="quiz-q">Last step — where should we send your results?</h3>
+        <p class="quiz-sub">A certified installer will call to confirm your eligibility and arrange a free survey.</p>
+        <div class="form-err" id="submitErr"></div>
+        <form id="lead-form">
+          <input type="hidden" name="access_key" value="612f0ea2-5df6-4f01-9ba0-96e059f0728e" />
+          <input type="hidden" name="subject" value="New Heat Pump Grant Enquiry" />
+          <input type="hidden" name="from_name" value="UK Heat Pump Grant" />
+          <input type="hidden" name="lead_grade" id="leadGrade" />
+          <input type="hidden" name="ownership" id="h_ownership" />
+          <input type="hidden" name="region" id="h_region" />
+          <input type="hidden" name="heating_system" id="h_heating" />
+          <input type="hidden" name="property_type" id="h_property" />
+          <input type="hidden" name="timeline" id="h_timeline" />
+          <input type="hidden" name="postcode" id="h_postcode" />
+          <div class="form-row">
+            <div class="form-group"><label>First Name</label><input type="text" name="first_name" placeholder="John" required /></div>
+            <div class="form-group"><label>Last Name</label><input type="text" name="last_name" placeholder="Smith" required /></div>
+          </div>
+          <div class="form-group"><label>Email Address</label><input type="email" name="email" placeholder="john@example.com" required /></div>
+          <div class="form-group"><label>Phone Number</label><input type="tel" name="phone" placeholder="07700 900000" pattern="[0-9\s]{10,11}" title="Please enter a valid UK phone number (10-11 digits)" required /></div>
+          <button type="submit" class="form-submit" id="submitBtn">Confirm My Eligibility →</button>
+          <p class="form-note">🔒 Your details are safe with us. We only share your information with MCS certified local installers. No spam, ever.</p>
+        </form>
+      </div>
+
+      <div class="quiz-step" data-step="exit-rent">
+        <div class="exit-screen">
+          <div class="exit-icon">🏠</div>
+          <h3>Sorry, the Boiler Upgrade Scheme is only available to homeowners</h3>
+          <p>The grant requires property ownership. If you're a tenant, consider sharing this page with your landlord — they may be eligible.</p>
         </div>
-        <div class="form-group"><label>Email Address</label><input type="email" name="email" placeholder="john@example.com" required /></div>
-        <div class="form-group"><label>Phone Number</label><input type="tel" name="phone" placeholder="07700 900000" pattern="[0-9\s]{10,11}" title="Please enter a valid UK phone number (10-11 digits)" required /></div>
-        <div class="form-group"><label>Postcode</label><input type="text" name="postcode" placeholder="AL1 1AA" required /></div>
-        <div class="form-group"><label>Current Heating System</label><select name="heating_system" required><option value="">Select your heating type</option><option>Gas Boiler</option><option>Oil Boiler</option><option>Electric Heating</option><option>LPG Boiler</option><option>Other</option></select></div>
-        <div class="form-group"><label>Property Type</label><select name="property_type" required><option value="">Select property type</option><option>Detached House</option><option>Semi-Detached House</option><option>Terraced House</option><option>Bungalow</option></select></div>
-        <div class="form-group"><label>Do you own the property?</label><select name="property_owned" required><option value="">Please select</option><option>Yes, I own it</option><option>No, I rent</option></select></div>
-        <p style="background:#FFF8E7; border:1px solid #FFE082; border-radius:8px; padding:0.8rem 1rem; font-size:0.82rem; color:#7A5800; margin-bottom:1rem; text-align:center;">⚠️ Funding is limited and allocated on a first come, first served basis. Check your eligibility today.</p>
-        <button type="submit" class="form-submit">Check If I Qualify For £7,500 →</button>
-        <p class="form-note">🔒 Your details are safe with us. We only share your information with MCS certified local installers. No spam, ever.</p>
-      </form>
-      <div class="success-msg" id="success">
-        <div class="tick-big">✓</div>
-        <h3>You're all set!</h3>
-        <p>Thanks for submitting your details. A local MCS certified installer will be in touch within 24 hours to confirm your eligibility and arrange a free survey.</p>
+      </div>
+
+      <div class="quiz-step" data-step="exit-region">
+        <div class="exit-screen">
+          <div class="exit-icon">📍</div>
+          <h3>Sorry, the BUS currently only covers England and Wales</h3>
+          <p>The Boiler Upgrade Scheme doesn't extend to Scotland or Northern Ireland. Scotland has its own Home Energy Scotland scheme that may help.</p>
+        </div>
+      </div>
+
+      <div class="quiz-step" data-step="exit-heatpump">
+        <div class="exit-screen">
+          <div class="exit-icon">✅</div>
+          <h3>You already have a qualifying system</h3>
+          <p>Heat pumps are already the most efficient low-carbon heating option available — no upgrade needed.</p>
+        </div>
+      </div>
+
+      <div class="quiz-step" data-step="exit-research">
+        <div class="exit-screen">
+          <div class="exit-icon">📚</div>
+          <h3>Thanks for your interest</h3>
+          <p>When you're ready to install, we'll be here to help. Leave your email below if you'd like a short guide about heat pumps and the grant.</p>
+          <form id="research-form" class="exit-email">
+            <input type="hidden" name="access_key" value="612f0ea2-5df6-4f01-9ba0-96e059f0728e" />
+            <input type="hidden" name="subject" value="Heat Pump Grant — Researcher Signup" />
+            <input type="hidden" name="from_name" value="UK Heat Pump Grant" />
+            <input type="hidden" name="lead_grade" value="D" />
+            <label>Email (optional)</label>
+            <input type="email" name="email" placeholder="you@example.com" />
+            <button type="submit" class="form-submit" id="researchBtn">Send me the guide</button>
+            <p class="form-note" id="researchNote" style="margin-top:0.8rem;">We'll never spam you. Unsubscribe anytime.</p>
+          </form>
+        </div>
+      </div>
+
+      <div class="quiz-step" data-step="confirmed">
+        <div class="confirm-screen">
+          <div class="tick-big">✓</div>
+          <h3 id="confirmHeading">Your eligibility has been confirmed</h3>
+          <p class="confirm-lead" id="confirmLead"></p>
+          <div class="next-steps">
+            <h4>What happens next</h4>
+            <ul>
+              <li>A certified installer will call to confirm your details and answer any questions.</li>
+              <li>They'll arrange a free home survey at a time that suits you — no obligation.</li>
+              <li>Your grant paperwork is handled for you, with the £7,500 deducted from your final quote.</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -202,47 +347,222 @@
   <p>© 2026 UK Heat Pump Grant · info@ukheatpumpgrant.co.uk · This site is not affiliated with the UK Government. We connect homeowners with MCS certified installers.</p>
 </footer>
 <script>
-function gtag_report_conversion(url) {
-  var callback = function () {
-    if (typeof(url) != 'undefined') { window.location = url; }
-  };
-  gtag('event', 'conversion', {
-    'send_to': 'AW-18066229023/GOAHCMHB15YcEJ-Q06ZD',
-    'event_callback': callback
+(function () {
+  const WEB3FORMS_URL = 'https://api.web3forms.com/submit';
+  const CONVERSION_SEND_TO = 'AW-18066229023/GOAHCMHB15YcEJ-Q06ZD';
+  const UK_POSTCODE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
+  const TOTAL_QUIZ_STEPS = 7;
+
+  const answers = {};
+  const history = [];
+  let currentStep = '1';
+
+  const stepEls = {};
+  document.querySelectorAll('.quiz-step').forEach(function (el) {
+    stepEls[el.dataset.step] = el;
   });
-  return false;
-}
-</script>
-<script>
-  async function submitForm(e) {
-    e.preventDefault();
-    const form = document.getElementById('lead-form');
-    const btn = form.querySelector('.form-submit');
-    btn.textContent = 'Submitting...';
-    btn.disabled = true;
-    const data = Object.fromEntries(new FormData(form));
-    try {
-      const res = await fetch('https://api.web3forms.com/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      const result = await res.json();
-      if (result.success) {
-        gtag_report_conversion();
-        form.style.display = 'none';
-        document.getElementById('success').style.display = 'block';
-      } else {
-        btn.textContent = 'Check If I Qualify For £7,500 →';
-        btn.disabled = false;
-        alert('Something went wrong. Please try again.');
-      }
-    } catch (err) {
-      btn.textContent = 'Check If I Qualify For £7,500 →';
-      btn.disabled = false;
-      alert('Something went wrong. Please try again.');
+
+  function updateProgress() {
+    const fill = document.getElementById('progressFill');
+    if (/^[1-7]$/.test(currentStep)) {
+      fill.style.width = ((parseInt(currentStep, 10) - 1) / TOTAL_QUIZ_STEPS * 100) + '%';
+    } else if (currentStep === 'confirmed') {
+      fill.style.width = '100%';
     }
   }
+
+  function show(step) {
+    if (!stepEls[step]) return;
+    stepEls[currentStep].classList.remove('active');
+    stepEls[step].classList.add('active');
+    currentStep = step;
+    updateProgress();
+    const card = document.querySelector('.form-card');
+    if (card && card.getBoundingClientRect().top < 0) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function advance(next) {
+    history.push(currentStep);
+    show(next);
+  }
+
+  function goBack() {
+    if (!history.length) return;
+    const prev = history.pop();
+    stepEls[currentStep].classList.remove('active');
+    stepEls[prev].classList.add('active');
+    currentStep = prev;
+    updateProgress();
+  }
+
+  document.querySelectorAll('.back-btn').forEach(function (b) {
+    b.addEventListener('click', goBack);
+  });
+
+  const stepRouters = {
+    '1': function (ans) { answers.ownership = ans; advance(ans === 'no' ? 'exit-rent' : '2'); },
+    '2': function (ans) { answers.region = ans; advance(ans === 'no' ? 'exit-region' : '3'); },
+    '3': function (ans) { answers.heating = ans; advance(ans === 'heat-pump' ? 'exit-heatpump' : '4'); },
+    '4': function (ans) { answers.property_type = ans; advance('5'); },
+    '5': function (ans) { answers.timeline = ans; advance(ans === 'researching' ? 'exit-research' : '6'); }
+  };
+
+  ['1', '2', '3', '4', '5'].forEach(function (s) {
+    stepEls[s].querySelectorAll('.option-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { stepRouters[s](btn.dataset.answer); });
+    });
+  });
+
+  const postcodeInput = document.getElementById('postcodeInput');
+  const postcodeErr = document.getElementById('postcodeErr');
+  function submitPostcode() {
+    const val = postcodeInput.value.trim();
+    if (!UK_POSTCODE.test(val)) {
+      postcodeErr.classList.add('show');
+      postcodeInput.focus();
+      return;
+    }
+    postcodeErr.classList.remove('show');
+    answers.postcode = val.toUpperCase();
+    advance('7');
+  }
+  document.getElementById('postcodeNext').addEventListener('click', submitPostcode);
+  postcodeInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); submitPostcode(); }
+  });
+  postcodeInput.addEventListener('input', function () {
+    if (postcodeErr.classList.contains('show')) postcodeErr.classList.remove('show');
+  });
+
+  function computeGrade() {
+    const fossil = ['gas', 'oil', 'lpg'].indexOf(answers.heating) !== -1;
+    const premium = ['detached', 'semi-detached', 'bungalow'].indexOf(answers.property_type) !== -1;
+    const urgent = answers.timeline === 'within-3-months';
+    const medium = answers.timeline === '3-6-months' || answers.timeline === '6-12-months';
+    if (fossil && premium && urgent) return 'A';
+    if (medium) return 'B';
+    return 'C';
+  }
+
+  function populateHidden() {
+    document.getElementById('h_ownership').value = answers.ownership || '';
+    document.getElementById('h_region').value = answers.region || '';
+    document.getElementById('h_heating').value = answers.heating || '';
+    document.getElementById('h_property').value = answers.property_type || '';
+    document.getElementById('h_timeline').value = answers.timeline || '';
+    document.getElementById('h_postcode').value = answers.postcode || '';
+    document.getElementById('leadGrade').value = computeGrade();
+  }
+
+  async function postToWeb3Forms(data) {
+    const res = await fetch(WEB3FORMS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    let body;
+    try { body = await res.json(); }
+    catch (e) {
+      try { body = { raw: await res.text() }; } catch (e2) { body = { raw: '<unreadable>' }; }
+    }
+    return { status: res.status, statusText: res.statusText, ok: res.ok, body: body };
+  }
+
+  function fireConversion(done) {
+    let fired = false;
+    const finish = function () { if (fired) return; fired = true; done(); };
+    try {
+      if (typeof gtag === 'function') {
+        gtag('event', 'conversion', {
+          'send_to': CONVERSION_SEND_TO,
+          'event_callback': finish
+        });
+      } else {
+        console.warn('[gtag] not available — skipping conversion event');
+      }
+    } catch (e) {
+      console.warn('[gtag] error firing conversion:', e);
+    }
+    setTimeout(finish, 1200);
+  }
+
+  document.getElementById('lead-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const btn = document.getElementById('submitBtn');
+    const errEl = document.getElementById('submitErr');
+    errEl.classList.remove('show');
+    populateHidden();
+    const data = Object.fromEntries(new FormData(form));
+    btn.textContent = 'Submitting...';
+    btn.disabled = true;
+    try {
+      const result = await postToWeb3Forms(data);
+      console.log('[Web3Forms] submit response:', result);
+      if (!result.ok || !result.body || result.body.success !== true) {
+        const reason = (result.body && result.body.message) ? result.body.message : ('HTTP ' + result.status + ' ' + result.statusText);
+        console.error('[Web3Forms] submission rejected:', reason, result);
+        errEl.textContent = 'Submission failed: ' + reason + '. Please try again or email info@ukheatpumpgrant.co.uk.';
+        errEl.classList.add('show');
+        btn.textContent = 'Confirm My Eligibility →';
+        btn.disabled = false;
+        return;
+      }
+      const firstName = (data.first_name || '').trim();
+      const phone = (data.phone || '').trim();
+      document.getElementById('confirmHeading').textContent = firstName
+        ? 'Thanks, ' + firstName + '. Your eligibility has been confirmed.'
+        : 'Your eligibility has been confirmed.';
+      document.getElementById('confirmLead').textContent =
+        'An MCS certified installer in your area will call you within 2 hours on ' + phone + '. In the meantime, here\'s what to expect.';
+      fireConversion(function () { advance('confirmed'); });
+    } catch (err) {
+      console.error('[Web3Forms] network error:', err);
+      errEl.textContent = 'Network error: ' + (err && err.message ? err.message : 'please check your connection and try again.');
+      errEl.classList.add('show');
+      btn.textContent = 'Confirm My Eligibility →';
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('research-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const btn = document.getElementById('researchBtn');
+    const note = document.getElementById('researchNote');
+    const data = Object.fromEntries(new FormData(form));
+    if (!data.email) {
+      note.textContent = 'No problem — thanks for your interest.';
+      btn.disabled = true;
+      return;
+    }
+    btn.textContent = 'Sending...';
+    btn.disabled = true;
+    try {
+      const result = await postToWeb3Forms(data);
+      console.log('[Web3Forms research] response:', result);
+      if (result.ok && result.body && result.body.success === true) {
+        note.textContent = '✓ Got it — check your inbox shortly.';
+        btn.textContent = 'Sent';
+      } else {
+        const reason = (result.body && result.body.message) ? result.body.message : ('HTTP ' + result.status);
+        console.error('[Web3Forms research] rejected:', reason, result);
+        note.textContent = 'Couldn\'t save your email (' + reason + ') — please try again later.';
+        btn.textContent = 'Send me the guide';
+        btn.disabled = false;
+      }
+    } catch (err) {
+      console.error('[Web3Forms research] network error:', err);
+      note.textContent = 'Network error — please try again.';
+      btn.textContent = 'Send me the guide';
+      btn.disabled = false;
+    }
+  });
+
+  updateProgress();
+})();
 </script>
 </body>
 </html>
