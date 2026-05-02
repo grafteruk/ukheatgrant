@@ -117,6 +117,7 @@
       .form-row { grid-template-columns: 1fr; }
     }
   </style>
+  <script src="https://www.google.com/recaptcha/api.js?render=6LfLg9UsAAAAAFzKvjX1OJVhmadpXL8WvgtdoJi6"></script>
 </head>
 <body>
 <nav>
@@ -496,6 +497,14 @@
     errEl.classList.remove('show');
     populateHidden();
     const data = Object.fromEntries(new FormData(form));
+
+    // Get reCAPTCHA token
+    try {
+      const token = await grecaptcha.execute('6LfLg9UsAAAAAFzKvjX1OJVhmadpXL8WvgtdoJi6', {action: 'submit'});
+      data['g-recaptcha-response'] = token;
+    } catch (err) {
+      console.error('reCAPTCHA failed:', err);
+    }
     btn.textContent = 'Submitting...';
     btn.disabled = true;
     try {
