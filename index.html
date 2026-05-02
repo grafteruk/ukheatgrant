@@ -501,7 +501,7 @@
     // Get reCAPTCHA token
     try {
       const token = await grecaptcha.execute('6LfLg9UsAAAAAFzKvjX1OJVhmadpXL8WvgtdoJi6', {action: 'submit'});
-      data['g-recaptcha-response'] = token;
+      data['recaptcha_token'] = token;
     } catch (err) {
       console.error('reCAPTCHA failed:', err);
     }
