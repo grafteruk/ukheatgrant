@@ -558,22 +558,25 @@
         : 'Thank you — your details have been received.';
       document.getElementById('confirmLead').textContent =
         'A member of the team at Kairi Heating Solutions, our MCS-certified installer, will be in touch shortly to discuss your enquiry, your eligibility, and the next steps.';
-      // Send the enquirer their confirmation email (Resend, via our Worker).
+      // Trigger the Worker (Resend): enquirer confirmation + our lead notification.
       // MAIN form only; best-effort and non-blocking — a failure here never
       // blocks the on-screen confirmation, the conversion, or the Web3Forms lead.
       // Mint a FRESH reCAPTCHA token for this call: v3 tokens verify only once,
       // and the token above was already handed to Web3Forms, so reusing it would
       // fail the Worker's siteverify. A dedicated 'confirm_email' token is independent.
+      // Pass the FULL lead payload so the Worker can build the notification.
       (async function () {
         var confirmToken = '';
         try {
           confirmToken = await grecaptcha.execute('6LfFykgtAAAAAFMlkTeYWOhiz9gVwQHqHs1kckuf', { action: 'confirm_email' });
         } catch (e) { /* no token — Worker rejects if verification is required */ }
+        var payload = Object.assign({}, data, { name: firstName, recaptcha_token: confirmToken });
+        delete payload.access_key; // Web3Forms-only; the Worker doesn't need it
         try {
           await fetch('/api/confirm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: data.email, name: firstName, recaptcha_token: confirmToken })
+            body: JSON.stringify(payload)
           });
         } catch (e) { console.warn('[confirm-email] request failed:', e); }
       })();

@@ -18,6 +18,18 @@ const SENDER = 'UK Heat Pump Grant <info@ukheatpumpgrant.co.uk>';
 const REPLY_TO = 'info@ukheatpumpgrant.co.uk';
 const SUBJECT = 'Thanks for your heat pump enquiry — Kairi Heating Solutions will be in touch';
 
+// Internal lead-notification recipient (fixed — this is us, not the enquirer).
+const NOTIFY_TO = 'info@ukheatpumpgrant.co.uk';
+
+// Maps raw quiz answer codes to human-readable labels for the notification.
+const LABELS = {
+  ownership: { yes: 'Yes — owns their home', no: 'No — rents' },
+  region: { yes: 'England or Wales', no: 'Scotland or Northern Ireland' },
+  heating: { 'gas': 'Gas boiler', 'oil': 'Oil boiler', 'lpg': 'LPG boiler', 'electric': 'Electric heating', 'heat-pump': 'Already has a heat pump' },
+  property: { 'detached': 'Detached house', 'semi-detached': 'Semi-detached house', 'terraced': 'Terraced house', 'bungalow': 'Bungalow' },
+  timeline: { 'within-3-months': 'Within 3 months', '3-6-months': '3–6 months', '6-12-months': '6–12 months', 'researching': 'Just researching' }
+};
+
 function buildBody(name) {
   const clean = (name || '').trim();
   const greeting = clean ? 'Hi ' + clean + ',' : 'Hi there,';
@@ -106,13 +118,149 @@ function json(obj, status) {
   });
 }
 
+// One Resend send. Throws on network error or non-2xx so callers can treat
+// each send independently (never leaks the API key or Resend's body).
+async function resendSend(env, msg) {
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + env.RESEND_API_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: SENDER,
+      to: [msg.to],
+      reply_to: msg.replyTo || REPLY_TO,
+      subject: msg.subject,
+      text: msg.text,
+      html: msg.html
+    })
+  });
+  if (!resp.ok) {
+    console.warn('[' + (msg.tag || 'email') + '] Resend returned status', resp.status);
+    throw new Error('resend_status_' + resp.status);
+  }
+  return true;
+}
+
+// Branded internal lead notification — built from the full form payload.
+function buildNotification(lead) {
+  const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lab = (map, v) => (v && map[v]) ? map[v] : (v ? v : '—');
+
+  const fullName = ((lead.first_name || '').trim() + ' ' + (lead.last_name || '').trim()).trim() || 'New lead';
+  const email = (lead.email || '').trim();
+  const phoneRaw = (lead.phone || '').trim();
+  const phoneTel = phoneRaw.replace(/[^\d+]/g, '');
+  const postcode = (lead.postcode || '').trim().toUpperCase() || '—';
+  const grade = (lead.lead_grade || '').trim() || '—';
+  const ownership = lab(LABELS.ownership, lead.ownership);
+  const region = lab(LABELS.region, lead.region);
+  const heating = lab(LABELS.heating, lead.heating_system);
+  const property = lab(LABELS.property, lead.property_type);
+  const timeline = lab(LABELS.timeline, lead.timeline);
+  const consent = (lead.consent === 'yes' || lead.consent === true) ? 'Given (ticked on submit)' : 'Not recorded';
+
+  let submitted;
+  try {
+    submitted = new Date().toLocaleString('en-GB', {
+      timeZone: 'Europe/London', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    }) + ' (UK time)';
+  } catch (e) { submitted = new Date().toUTCString(); }
+
+  const gradeBg = { A: '#1A6B3C', B: '#B8860B', C: '#5d6f80' }[grade] || '#5d6f80';
+  const subject = 'New Heat Pump Grant Lead — ' + fullName;
+
+  const text = [
+    'New Heat Pump Grant Lead', '',
+    'Name:        ' + fullName,
+    'Phone:       ' + (phoneRaw || '—'),
+    'Email:       ' + (email || '—'),
+    'Postcode:    ' + postcode,
+    'Lead grade:  ' + grade, '',
+    'Homeowner:       ' + ownership,
+    'Region:          ' + region,
+    'Current heating: ' + heating,
+    'Property type:   ' + property,
+    'Timeline:        ' + timeline,
+    'Consent:         ' + consent,
+    'Submitted:       ' + submitted,
+    'Source:          ukheatpumpgrant.co.uk — main eligibility form', '',
+    'Sent alongside your Web3Forms notification during the parallel-running period.'
+  ].join('\n');
+
+  const row = (l, v) => '<tr><td style="padding:10px 14px;background:#FAFAF8;color:#5d6f80;width:42%;border-bottom:1px solid #EEF2F0;">' + esc(l) + '</td><td style="padding:10px 14px;color:#1A1A1A;font-weight:600;border-bottom:1px solid #EEF2F0;">' + esc(v) + '</td></tr>';
+  const rowLast = (l, v) => '<tr><td style="padding:10px 14px;background:#FAFAF8;color:#5d6f80;width:42%;">' + esc(l) + '</td><td style="padding:10px 14px;color:#1A1A1A;font-weight:600;">' + esc(v) + '</td></tr>';
+
+  const html =
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e9edf0;margin:0;padding:0;">' +
+      '<tr><td align="center" style="padding:12px;">' +
+        '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #E0E8E4;">' +
+          '<tr><td style="background:#1A6B3C;padding:26px 32px;">' +
+            '<div style="font-family:Georgia,\'Times New Roman\',serif;font-size:23px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">UK Heat Pump Grant</div>' +
+            '<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:rgba(255,255,255,0.72);letter-spacing:0.1em;text-transform:uppercase;margin-top:5px;">New lead notification</div>' +
+          '</td></tr>' +
+          '<tr><td style="height:4px;background:#2E8B57;font-size:0;line-height:0;">&nbsp;</td></tr>' +
+          '<tr><td style="padding:24px 32px 8px;font-family:Arial,Helvetica,sans-serif;">' +
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>' +
+              '<td style="vertical-align:middle;">' +
+                '<div style="font-family:Georgia,\'Times New Roman\',serif;font-size:22px;font-weight:700;color:#1A1A1A;line-height:1.2;">' + esc(fullName) + '</div>' +
+                '<div style="font-size:12px;color:#777;margin-top:3px;">New enquiry via the main eligibility form</div>' +
+              '</td>' +
+              '<td style="vertical-align:middle;text-align:right;white-space:nowrap;">' +
+                '<span style="display:inline-block;background:' + gradeBg + ';color:#fff;font-size:12px;font-weight:700;letter-spacing:0.03em;padding:6px 12px;border-radius:100px;">GRADE ' + esc(grade) + '</span>' +
+              '</td>' +
+            '</tr></table>' +
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;background:#F0F7F3;border:1px solid #D4EBE0;border-radius:8px;"><tr>' +
+              '<td style="padding:14px 16px;border-right:1px solid #D4EBE0;width:50%;">' +
+                '<div style="font-size:10px;color:#5d6f80;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;">Phone</div>' +
+                '<a href="tel:' + esc(phoneTel) + '" style="font-size:18px;font-weight:700;color:#1A6B3C;text-decoration:none;">' + esc(phoneRaw || '—') + '</a>' +
+              '</td>' +
+              '<td style="padding:14px 16px;width:50%;">' +
+                '<div style="font-size:10px;color:#5d6f80;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;">Email</div>' +
+                '<a href="mailto:' + esc(email) + '" style="font-size:14px;font-weight:600;color:#1A6B3C;text-decoration:none;word-break:break-all;">' + esc(email || '—') + '</a>' +
+              '</td>' +
+            '</tr></table>' +
+          '</td></tr>' +
+          '<tr><td style="padding:16px 32px 8px;font-family:Arial,Helvetica,sans-serif;">' +
+            '<div style="font-size:11px;color:#5d6f80;text-transform:uppercase;letter-spacing:0.09em;font-weight:700;margin-bottom:6px;">Lead details</div>' +
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E0E8E4;border-radius:8px;overflow:hidden;font-size:14px;">' +
+              row('Postcode', postcode) +
+              row('Homeowner', ownership) +
+              row('Region', region) +
+              row('Current heating', heating) +
+              row('Property type', property) +
+              row('Timeline', timeline) +
+              row('Lead grade', grade) +
+              row('Consent', consent) +
+              row('Submitted', submitted) +
+              rowLast('Source', 'ukheatpumpgrant.co.uk — main eligibility form') +
+            '</table>' +
+          '</td></tr>' +
+          '<tr><td style="padding:14px 32px 26px;font-family:Arial,Helvetica,sans-serif;">' +
+            '<div style="font-size:12px;color:#777;">Sent alongside your Web3Forms notification during the parallel-running period.</div>' +
+          '</td></tr>' +
+          '<tr><td style="background:#0F3D25;padding:20px 32px;font-family:Arial,Helvetica,sans-serif;">' +
+            '<div style="font-size:13px;color:rgba(255,255,255,0.9);font-weight:700;margin-bottom:7px;">UK Heat Pump Grant</div>' +
+            '<div style="font-size:11px;color:rgba(255,255,255,0.55);line-height:1.7;">' +
+              'Operated by GrafterUK Ltd &middot; Registered in England &amp; Wales, Company No. 17303977<br>' +
+              'Internal lead notification &middot; Contact: <a href="mailto:info@ukheatpumpgrant.co.uk" style="color:rgba(255,255,255,0.78);text-decoration:none;">info@ukheatpumpgrant.co.uk</a>' +
+            '</div>' +
+          '</td></tr>' +
+        '</table>' +
+      '</td></tr>' +
+    '</table>';
+
+  return { subject, text, html };
+}
+
 async function handleConfirm(request, env) {
   let data;
   try { data = await request.json(); }
   catch (e) { return json({ ok: false, error: 'bad_request' }, 400); }
 
   const email = data && data.email;
-  const name = (data && data.name) || '';
+  const name = (data && (data.name || data.first_name)) || '';
   if (!isValidEmail(email)) return json({ ok: false, error: 'invalid_email' }, 400);
 
   // Optional anti-abuse: verify the form's reCAPTCHA token when a secret is set.
@@ -124,34 +272,20 @@ async function handleConfirm(request, env) {
 
   if (!env.RESEND_API_KEY) return json({ ok: false, error: 'not_configured' }, 503);
 
-  const { text, html } = buildBody(name);
-  let resp;
-  try {
-    resp = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + env.RESEND_API_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: SENDER,
-        to: [email],
-        reply_to: REPLY_TO,
-        subject: SUBJECT,
-        text: text,
-        html: html
-      })
-    });
-  } catch (e) {
-    return json({ ok: false, error: 'send_failed' }, 502);
-  }
+  // Two independent sends: the enquirer confirmation and the internal lead
+  // notification to us. allSettled → a failure in one never blocks the other,
+  // and Web3Forms is a separate client-side path, so it's unaffected regardless.
+  const confirmation = buildBody(name);
+  const notification = buildNotification(data);
+  const [confRes, notifRes] = await Promise.allSettled([
+    resendSend(env, { to: email, subject: SUBJECT, text: confirmation.text, html: confirmation.html, replyTo: REPLY_TO, tag: 'confirm-email' }),
+    // Reply-To = info@ (leads go to Ben/Kairi; we don't reply to customers
+    // directly). The enquirer's email is still a mailto link in the body.
+    resendSend(env, { to: NOTIFY_TO, subject: notification.subject, text: notification.text, html: notification.html, replyTo: REPLY_TO, tag: 'lead-notify' })
+  ]);
 
-  if (!resp.ok) {
-    // Log status only — never echo Resend's response (avoid leaking anything).
-    console.warn('[confirm-email] Resend returned status', resp.status);
-    return json({ ok: false, error: 'send_rejected' }, 502);
-  }
-  return json({ ok: true }, 200);
+  const st = (r) => r.status === 'fulfilled' ? 'sent' : 'failed';
+  return json({ ok: confRes.status === 'fulfilled', confirmation: st(confRes), notification: st(notifRes) }, 200);
 }
 
 export default {
