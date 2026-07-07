@@ -139,7 +139,7 @@
       .form-row { grid-template-columns: 1fr; }
     }
   </style>
-  <script src="https://www.google.com/recaptcha/api.js?render=6LfLg9UsAAAAAFzKvjX1OJVhmadpXL8WvgtdoJi6"></script>
+  <script src="https://www.google.com/recaptcha/api.js?render=6LfFykgtAAAAAFMlkTeYWOhiz9gVwQHqHs1kckuf"></script>
 </head>
 <body>
 <nav>
@@ -533,7 +533,7 @@
 
     // Get reCAPTCHA token
     try {
-      const token = await grecaptcha.execute('6LfLg9UsAAAAAFzKvjX1OJVhmadpXL8WvgtdoJi6', {action: 'submit'});
+      const token = await grecaptcha.execute('6LfFykgtAAAAAFMlkTeYWOhiz9gVwQHqHs1kckuf', {action: 'submit'});
       data['recaptcha_token'] = token;
     } catch (err) {
       console.error('reCAPTCHA failed:', err);
@@ -567,7 +567,7 @@
       (async function () {
         var confirmToken = '';
         try {
-          confirmToken = await grecaptcha.execute('6LfLg9UsAAAAAFzKvjX1OJVhmadpXL8WvgtdoJi6', { action: 'confirm_email' });
+          confirmToken = await grecaptcha.execute('6LfFykgtAAAAAFMlkTeYWOhiz9gVwQHqHs1kckuf', { action: 'confirm_email' });
         } catch (e) { /* no token — Worker rejects if verification is required */ }
         try {
           await fetch('/api/confirm', {
