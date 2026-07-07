@@ -206,7 +206,7 @@
   <div class="form-inner">
     <span class="section-label">Free Eligibility Check</span>
     <h2>Check if you qualify</h2>
-    <p>Fill in your details below and a local MCS certified installer will be in touch to confirm your eligibility and provide a free no-obligation quote.</p>
+    <p>Enquiries are handled by our MCS-certified installation partner, Kairi Heating Solutions, who will contact you directly to discuss your eligibility and the next steps.</p>
     <div style="display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
       <div style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:0.8rem 1.2rem; flex:1; min-width:140px; text-align:center;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.5rem; color:#fff;">100,000+</div>
@@ -299,7 +299,7 @@
           <div class="form-group"><label>Phone Number</label><input type="tel" name="phone" placeholder="07700 900000" pattern="[\d\s]{10,15}" title="Please enter a valid UK phone number" autocomplete="tel" required /></div>
           <div class="consent">
             <input type="checkbox" name="consent" id="leadConsent" value="yes" required />
-            <label for="leadConsent">I agree that my details will be passed to a vetted MCS-certified heat pump installer so they can contact me about my enquiry and provide a quote. I've read the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</label>
+            <label for="leadConsent">I agree that my details will be passed to Kairi Heating Solutions, a vetted MCS-certified heat pump installer, so they can contact me regarding my enquiry to discuss my eligibility and next steps. I've read the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</label>
           </div>
           <button type="submit" class="form-submit" id="submitBtn">Confirm My Eligibility →</button>
         </form>
@@ -359,7 +359,7 @@
           <div class="next-steps">
             <h4>What happens next</h4>
             <ul>
-              <li>A certified installer will call to confirm your details and answer any questions.</li>
+              <li>Kairi Heating Solutions, our MCS-certified installer, will contact you to discuss your enquiry, eligibility and next steps.</li>
               <li>They'll arrange a free home survey at a time that suits you — no obligation.</li>
               <li>Your grant paperwork is handled for you, with the £7,500 deducted from your final quote.</li>
             </ul>
@@ -553,12 +553,11 @@
         return;
       }
       const firstName = (data.first_name || '').trim();
-      const phone = (data.phone || '').trim();
       document.getElementById('confirmHeading').textContent = firstName
-        ? 'Thanks, ' + firstName + '. Your eligibility has been confirmed.'
-        : 'Your eligibility has been confirmed.';
+        ? 'Thanks, ' + firstName + '. Your details have been received.'
+        : 'Thank you — your details have been received.';
       document.getElementById('confirmLead').textContent =
-        'An MCS certified installer in your area will call you within 2 hours on ' + phone + '. In the meantime, here\'s what to expect.';
+        'A member of the team at Kairi Heating Solutions, our MCS-certified installer, will be in touch shortly to discuss your enquiry, your eligibility, and the next steps.';
       fireConversion(function () { advance('confirmed'); });
     } catch (err) {
       console.error('[Web3Forms] network error:', err);
