@@ -268,6 +268,11 @@ async function handleConfirm(request, env) {
     if (!ok) return json({ ok: false, error: 'verification_failed' }, 403);
   }
 
+  // DURABLE CAPTURE FIRST — write the full lead to KV before any email, so a mail
+  // outage costs latency, not the lead. (recaptcha_token excluded; it's spent.)
+  const { recaptcha_token, ...lead } = data;
+  const captured = await captureLead(env, 'heatpump-lead', lead);
+
   // Two independent sends via Cloudflare Email Sending: the enquirer confirmation
   // and the internal lead notification to us. allSettled → a failure in one never
   // blocks the other, and Web3Forms is a separate client-side path, unaffected.
@@ -279,10 +284,10 @@ async function handleConfirm(request, env) {
     sendMail(env, { to: NOTIFY_TO, subject: notification.subject, text: notification.text, html: notification.html, replyTo: REPLY_TO, tag: 'lead-notify' })
   ]);
 
-  // ok reflects the LEAD notification (the capture that must not be lost — Web3Forms
-  // is gone, so this is the only path). The customer confirmation is best-effort.
+  // The lead is safe if it was durably captured (KV) OR the notification emailed.
+  // Only both failing is a true failure the customer should retry.
   const st = (r) => r.status === 'fulfilled' ? 'sent' : 'failed';
-  return json({ ok: notifRes.status === 'fulfilled', confirmation: st(confRes), notification: st(notifRes) }, 200);
+  return json({ ok: captured || notifRes.status === 'fulfilled', confirmation: st(confRes), notification: st(notifRes), captured }, 200);
 }
 
 // Green-branded shell for the lightweight "just researching" guide signup emails.
@@ -297,6 +302,16 @@ function greenShell(label, inner) {
     '</table></td></tr></table>';
 }
 
+// Durable capture: write a submission to KV before any email is attempted, so a
+// mail-provider outage costs latency, not the lead. Best-effort; never throws.
+async function captureLead(env, source, payload) {
+  try {
+    const key = source + ':' + new Date().toISOString() + ':' + crypto.randomUUID().slice(0, 8);
+    await env.LEADS.put(key, JSON.stringify(Object.assign({}, payload, { capturedAt: new Date().toISOString(), source })));
+    return true;
+  } catch (e) { console.error('[kv] lead capture failed', String(e)); return false; }
+}
+
 async function handleResearch(request, env) {
   let d;
   try { d = await request.json(); } catch (e) { return json({ ok: false, error: 'bad_request' }, 400); }
@@ -306,6 +321,7 @@ async function handleResearch(request, env) {
     const ok = await verifyRecaptcha(d.recaptcha_token, env.RECAPTCHA_SECRET, request.headers.get('CF-Connecting-IP'));
     if (!ok) return json({ ok: false, error: 'verification_failed' }, 403);
   }
+  const captured = await captureLead(env, 'heatpump-research', { email });
   const notif = {
     subject: 'New guide signup — ' + email,
     text: 'New "just researching" guide signup (not a full eligibility lead).\n\nEmail: ' + email + '\nSource: ukheatpumpgrant.co.uk research signup',
@@ -320,7 +336,7 @@ async function handleResearch(request, env) {
     sendMail(env, { to: NOTIFY_TO, subject: notif.subject, text: notif.text, html: notif.html, tag: 'research-notify' }),
     sendMail(env, { to: email, subject: conf.subject, text: conf.text, html: conf.html, tag: 'research-confirm' })
   ]);
-  return json({ ok: n.status === 'fulfilled' }, 200);
+  return json({ ok: captured || n.status === 'fulfilled' }, 200);
 }
 
 export default {

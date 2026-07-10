@@ -17,5 +17,11 @@
     {
       "name": "EMAIL"
     }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "LEADS",
+      "id": "41834943055a4fc88c4f198891a9f0fc"
+    }
   ]
 }
