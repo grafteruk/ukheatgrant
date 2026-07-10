@@ -2,14 +2,14 @@
   Cloudflare Worker for ukheatpumpgrant.co.uk
   ---------------------------------------------------------------------------
   - Serves the existing static site unchanged, via the ASSETS binding.
-  - Adds ONE endpoint, POST /api/confirm, which sends the enquirer their
-    confirmation email through the Resend API. It is called ONLY by the main
-    lead form on a successful submit (the "just researching" signup never
-    calls it). Web3Forms still emails the lead to us as before — this Worker
-    only handles the enquirer's confirmation, in parallel.
+  - POST /api/confirm sends TWO emails via Cloudflare Email Sending (env.EMAIL):
+    the enquirer's branded confirmation and the internal lead notification. Called
+    only by the main lead form on a successful submit. Web3Forms still emails the
+    lead to us as before, in parallel (belt-and-braces on a live revenue site).
 
-  Secrets (set with `wrangler secret put`, never in code / never committed):
-    - RESEND_API_KEY      (required) Resend API key.
+  Binding: EMAIL (send_email) — domain ukheatpumpgrant.co.uk onboarded to Email
+  Sending. No email API keys. (Migrated off Resend — CF native sending, 2026.)
+  Secrets (wrangler secret put, never in code):
     - RECAPTCHA_SECRET    (optional) if set, /api/confirm verifies the form's
                           reCAPTCHA v3 token before sending — anti-abuse.
 */
@@ -118,27 +118,25 @@ function json(obj, status) {
   });
 }
 
-// One Resend send. Throws on network error or non-2xx so callers can treat
-// each send independently (never leaks the API key or Resend's body).
-async function resendSend(env, msg) {
-  const resp = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + env.RESEND_API_KEY,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: SENDER,
-      to: [msg.to],
-      reply_to: msg.replyTo || REPLY_TO,
-      subject: msg.subject,
-      text: msg.text,
-      html: msg.html
-    })
+// One send via Cloudflare Email Sending (native env.EMAIL binding — no API key).
+// Same branded templates; only the transport changes. Throws on error so callers
+// can treat each send independently, exactly like resendSend did.
+async function sendMail(env, msg) {
+  const m = /<([^>]+)>/.exec(SENDER);
+  const fromEmail = (m ? m[1] : SENDER).trim();
+  const fromName = SENDER.replace(/<[^>]*>/, '').trim() || undefined;
+  const res = await env.EMAIL.send({
+    to: msg.to,
+    from: { email: fromEmail, name: fromName },
+    replyTo: msg.replyTo || REPLY_TO,
+    subject: msg.subject,
+    text: msg.text,
+    html: msg.html
   });
-  if (!resp.ok) {
-    console.warn('[' + (msg.tag || 'email') + '] Resend returned status', resp.status);
-    throw new Error('resend_status_' + resp.status);
+  if (res && Array.isArray(res.permanent_bounces) && res.permanent_bounces.length &&
+      !(Array.isArray(res.delivered) && res.delivered.length) &&
+      !(Array.isArray(res.queued) && res.queued.length)) {
+    throw new Error('cf_email_bounced');
   }
   return true;
 }
@@ -270,18 +268,15 @@ async function handleConfirm(request, env) {
     if (!ok) return json({ ok: false, error: 'verification_failed' }, 403);
   }
 
-  if (!env.RESEND_API_KEY) return json({ ok: false, error: 'not_configured' }, 503);
-
-  // Two independent sends: the enquirer confirmation and the internal lead
-  // notification to us. allSettled → a failure in one never blocks the other,
-  // and Web3Forms is a separate client-side path, so it's unaffected regardless.
+  // Two independent sends via Cloudflare Email Sending: the enquirer confirmation
+  // and the internal lead notification to us. allSettled → a failure in one never
+  // blocks the other, and Web3Forms is a separate client-side path, unaffected.
   const confirmation = buildBody(name);
   const notification = buildNotification(data);
   const [confRes, notifRes] = await Promise.allSettled([
-    resendSend(env, { to: email, subject: SUBJECT, text: confirmation.text, html: confirmation.html, replyTo: REPLY_TO, tag: 'confirm-email' }),
-    // Reply-To = info@ (leads go to Ben/Kairi; we don't reply to customers
-    // directly). The enquirer's email is still a mailto link in the body.
-    resendSend(env, { to: NOTIFY_TO, subject: notification.subject, text: notification.text, html: notification.html, replyTo: REPLY_TO, tag: 'lead-notify' })
+    sendMail(env, { to: email, subject: SUBJECT, text: confirmation.text, html: confirmation.html, replyTo: REPLY_TO, tag: 'confirm-email' }),
+    // Reply-To = info@ (leads go to Ben/Kairi; we don't reply to customers directly).
+    sendMail(env, { to: NOTIFY_TO, subject: notification.subject, text: notification.text, html: notification.html, replyTo: REPLY_TO, tag: 'lead-notify' })
   ]);
 
   const st = (r) => r.status === 'fulfilled' ? 'sent' : 'failed';
