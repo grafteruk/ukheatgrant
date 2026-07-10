@@ -281,7 +281,6 @@
         <p class="quiz-sub">A certified installer will call to confirm your eligibility and arrange a free survey.</p>
         <div class="form-err" id="submitErr" role="alert" aria-live="assertive"></div>
         <form id="lead-form">
-          <input type="hidden" name="access_key" value="612f0ea2-5df6-4f01-9ba0-96e059f0728e" />
           <input type="hidden" name="subject" value="New Heat Pump Grant Enquiry" />
           <input type="hidden" name="from_name" value="UK Heat Pump Grant" />
           <input type="hidden" name="lead_grade" id="leadGrade" />
@@ -335,7 +334,6 @@
           <h3>Thanks for your interest</h3>
           <p>When you're ready to install, we'll be here to help. Leave your email below if you'd like a short guide about heat pumps and the grant.</p>
           <form id="research-form" class="exit-email">
-            <input type="hidden" name="access_key" value="612f0ea2-5df6-4f01-9ba0-96e059f0728e" />
             <input type="hidden" name="subject" value="Heat Pump Grant — Researcher Signup" />
             <input type="hidden" name="from_name" value="UK Heat Pump Grant" />
             <input type="hidden" name="lead_grade" value="D" />
@@ -374,7 +372,6 @@
 </footer>
 <script>
 (function () {
-  const WEB3FORMS_URL = 'https://api.web3forms.com/submit';
   const CONVERSION_SEND_TO = 'AW-18066229023/GOAHCMHB15YcEJ-O06ZD';
   const UK_POSTCODE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
   const TOTAL_QUIZ_STEPS = 7;
@@ -482,20 +479,6 @@
     document.getElementById('leadGrade').value = computeGrade();
   }
 
-  async function postToWeb3Forms(data) {
-    const res = await fetch(WEB3FORMS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    let body;
-    try { body = await res.json(); }
-    catch (e) {
-      try { body = { raw: await res.text() }; } catch (e2) { body = { raw: '<unreadable>' }; }
-    }
-    return { status: res.status, statusText: res.statusText, ok: res.ok, body: body };
-  }
-
   function fireConversion(done) {
     let fired = false;
     const finish = function () { if (fired) return; fired = true; done(); };
@@ -531,58 +514,41 @@
     const data = Object.fromEntries(new FormData(form));
     if (data.phone) data.phone = data.phone.replace(/\s+/g, '');
 
-    // Get reCAPTCHA token
+    // reCAPTCHA token for the Worker (single server call now — Web3Forms removed).
     try {
-      const token = await grecaptcha.execute('6LfFykgtAAAAAFMlkTeYWOhiz9gVwQHqHs1kckuf', {action: 'submit'});
-      data['recaptcha_token'] = token;
+      data['recaptcha_token'] = await grecaptcha.execute('6LfFykgtAAAAAFMlkTeYWOhiz9gVwQHqHs1kckuf', { action: 'submit' });
     } catch (err) {
       console.error('reCAPTCHA failed:', err);
     }
     btn.textContent = 'Submitting...';
     btn.disabled = true;
     try {
-      const result = await postToWeb3Forms(data);
-      console.log('[Web3Forms] submit response:', result);
-      if (!result.ok || !result.body || result.body.success !== true) {
-        const reason = (result.body && result.body.message) ? result.body.message : ('HTTP ' + result.status + ' ' + result.statusText);
-        console.error('[Web3Forms] submission rejected:', reason, result);
-        errEl.textContent = 'Submission failed: ' + reason + '. Please try again or email info@ukheatpumpgrant.co.uk.';
+      const firstName = (data.first_name || '').trim();
+      const payload = Object.assign({}, data, { name: firstName });
+      delete payload.access_key; // legacy Web3Forms field; unused
+      // Cloudflare Worker is now the sole path: it captures the lead (notification
+      // to us) AND sends the enquirer confirmation. Success is gated on the LEAD
+      // being captured, so a failure shows an error rather than losing the lead.
+      const res = await fetch('/api/confirm', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      let out = {}; try { out = await res.json(); } catch (e) { /* non-JSON */ }
+      if (!res.ok || !out.ok) {
+        console.error('[lead] capture failed:', res.status, out);
+        errEl.textContent = 'Submission failed — please try again, or email info@ukheatpumpgrant.co.uk.';
         errEl.classList.add('show');
         btn.textContent = 'Confirm My Eligibility →';
         btn.disabled = false;
         return;
       }
-      const firstName = (data.first_name || '').trim();
       document.getElementById('confirmHeading').textContent = firstName
         ? 'Thanks, ' + firstName + '. Your details have been received.'
         : 'Thank you — your details have been received.';
       document.getElementById('confirmLead').textContent =
         'A member of the team at Kairi Heating Solutions, our MCS-certified installer, will be in touch shortly to discuss your enquiry, your eligibility, and the next steps.';
-      // Trigger the Worker (Resend): enquirer confirmation + our lead notification.
-      // MAIN form only; best-effort and non-blocking — a failure here never
-      // blocks the on-screen confirmation, the conversion, or the Web3Forms lead.
-      // Mint a FRESH reCAPTCHA token for this call: v3 tokens verify only once,
-      // and the token above was already handed to Web3Forms, so reusing it would
-      // fail the Worker's siteverify. A dedicated 'confirm_email' token is independent.
-      // Pass the FULL lead payload so the Worker can build the notification.
-      (async function () {
-        var confirmToken = '';
-        try {
-          confirmToken = await grecaptcha.execute('6LfFykgtAAAAAFMlkTeYWOhiz9gVwQHqHs1kckuf', { action: 'confirm_email' });
-        } catch (e) { /* no token — Worker rejects if verification is required */ }
-        var payload = Object.assign({}, data, { name: firstName, recaptcha_token: confirmToken });
-        delete payload.access_key; // Web3Forms-only; the Worker doesn't need it
-        try {
-          await fetch('/api/confirm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-        } catch (e) { console.warn('[confirm-email] request failed:', e); }
-      })();
       fireConversion(function () { advance('confirmed'); });
     } catch (err) {
-      console.error('[Web3Forms] network error:', err);
+      console.error('[lead] network error:', err);
       errEl.textContent = 'Network error: ' + (err && err.message ? err.message : 'please check your connection and try again.');
       errEl.classList.add('show');
       btn.textContent = 'Confirm My Eligibility →';
@@ -610,20 +576,23 @@
     btn.textContent = 'Sending...';
     btn.disabled = true;
     try {
-      const result = await postToWeb3Forms(data);
-      console.log('[Web3Forms research] response:', result);
-      if (result.ok && result.body && result.body.success === true) {
-        note.textContent = '✓ Got it — check your inbox shortly.';
+      try { data['recaptcha_token'] = await grecaptcha.execute('6LfFykgtAAAAAFMlkTeYWOhiz9gVwQHqHs1kckuf', { action: 'research' }); } catch (e) { /* no token */ }
+      const payload = Object.assign({}, data); delete payload.access_key;
+      const res = await fetch('/api/research', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      let out = {}; try { out = await res.json(); } catch (e) { /* non-JSON */ }
+      if (res.ok && out.ok) {
+        note.textContent = '✓ Got it — we\'ll be in touch shortly.';
         btn.textContent = 'Sent';
       } else {
-        const reason = (result.body && result.body.message) ? result.body.message : ('HTTP ' + result.status);
-        console.error('[Web3Forms research] rejected:', reason, result);
-        note.textContent = 'Couldn\'t save your email (' + reason + ') — please try again later.';
+        console.error('[research] rejected:', res.status, out);
+        note.textContent = 'Couldn\'t save your email — please try again later.';
         btn.textContent = 'Send me the guide';
         btn.disabled = false;
       }
     } catch (err) {
-      console.error('[Web3Forms research] network error:', err);
+      console.error('[research] network error:', err);
       note.textContent = 'Network error — please try again.';
       btn.textContent = 'Send me the guide';
       btn.disabled = false;

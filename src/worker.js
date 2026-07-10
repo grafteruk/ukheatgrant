@@ -279,8 +279,48 @@ async function handleConfirm(request, env) {
     sendMail(env, { to: NOTIFY_TO, subject: notification.subject, text: notification.text, html: notification.html, replyTo: REPLY_TO, tag: 'lead-notify' })
   ]);
 
+  // ok reflects the LEAD notification (the capture that must not be lost — Web3Forms
+  // is gone, so this is the only path). The customer confirmation is best-effort.
   const st = (r) => r.status === 'fulfilled' ? 'sent' : 'failed';
-  return json({ ok: confRes.status === 'fulfilled', confirmation: st(confRes), notification: st(notifRes) }, 200);
+  return json({ ok: notifRes.status === 'fulfilled', confirmation: st(confRes), notification: st(notifRes) }, 200);
+}
+
+// Green-branded shell for the lightweight "just researching" guide signup emails.
+function greenShell(label, inner) {
+  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e9edf0;margin:0;padding:0;">' +
+    '<tr><td align="center" style="padding:12px;"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #E0E8E4;">' +
+    '<tr><td style="background:#1A6B3C;padding:24px 32px;"><div style="font-family:Georgia,\'Times New Roman\',serif;font-size:21px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">UK Heat Pump Grant</div>' +
+    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:rgba(255,255,255,0.72);letter-spacing:0.1em;text-transform:uppercase;margin-top:5px;">' + label + '</div></td></tr>' +
+    '<tr><td style="height:4px;background:#2E8B57;font-size:0;line-height:0;">&nbsp;</td></tr>' +
+    '<tr><td style="padding:26px 32px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.65;color:#1A1A1A;">' + inner + '</td></tr>' +
+    '<tr><td style="background:#0F3D25;padding:18px 32px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:rgba(255,255,255,0.55);line-height:1.7;">Operated by GrafterUK Ltd &middot; Company No. 17303977 &middot; <a href="mailto:info@ukheatpumpgrant.co.uk" style="color:rgba(255,255,255,0.78);text-decoration:none;">info@ukheatpumpgrant.co.uk</a><br>Not affiliated with the UK Government. We connect homeowners with MCS-certified installers.</td></tr>' +
+    '</table></td></tr></table>';
+}
+
+async function handleResearch(request, env) {
+  let d;
+  try { d = await request.json(); } catch (e) { return json({ ok: false, error: 'bad_request' }, 400); }
+  const email = d && d.email;
+  if (!isValidEmail(email)) return json({ ok: false, error: 'invalid_email' }, 400);
+  if (env.RECAPTCHA_SECRET) {
+    const ok = await verifyRecaptcha(d.recaptcha_token, env.RECAPTCHA_SECRET, request.headers.get('CF-Connecting-IP'));
+    if (!ok) return json({ ok: false, error: 'verification_failed' }, 403);
+  }
+  const notif = {
+    subject: 'New guide signup — ' + email,
+    text: 'New "just researching" guide signup (not a full eligibility lead).\n\nEmail: ' + email + '\nSource: ukheatpumpgrant.co.uk research signup',
+    html: greenShell('New guide signup', '<p style="margin:0 0 8px;">Someone signed up for the guide (not a full eligibility lead):</p><p style="margin:0;font-size:18px;font-weight:700;"><a href="mailto:' + email + '" style="color:#1A6B3C;text-decoration:none;">' + email + '</a></p>')
+  };
+  const conf = {
+    subject: 'Thanks for your interest — UK Heat Pump Grant',
+    text: 'Hi,\n\nThanks for your interest in the heat pump grant scheme. We\'ll be in touch with useful, no-pressure information on grants and what they could mean for your home.\n\nWhen you\'re ready to check your eligibility properly, just head back to ukheatpumpgrant.co.uk.\n\nBest regards,\nThe team at ukheatpumpgrant.co.uk',
+    html: greenShell('Thanks for your interest', '<p style="margin:0 0 14px;">Thanks for your interest in the heat pump grant scheme. We\'ll be in touch with useful, no-pressure information on grants and what they could mean for your home.</p><p style="margin:0 0 14px;">When you\'re ready to check your eligibility properly, just head back to <a href="https://ukheatpumpgrant.co.uk" style="color:#1A6B3C;font-weight:600;text-decoration:none;">ukheatpumpgrant.co.uk</a>.</p><p style="margin:0;">Best regards,<br><strong>The team at ukheatpumpgrant.co.uk</strong></p>')
+  };
+  const [n] = await Promise.allSettled([
+    sendMail(env, { to: NOTIFY_TO, subject: notif.subject, text: notif.text, html: notif.html, tag: 'research-notify' }),
+    sendMail(env, { to: email, subject: conf.subject, text: conf.text, html: conf.html, tag: 'research-confirm' })
+  ]);
+  return json({ ok: n.status === 'fulfilled' }, 200);
 }
 
 export default {
@@ -289,6 +329,10 @@ export default {
     if (url.pathname === '/api/confirm') {
       if (request.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
       return handleConfirm(request, env);
+    }
+    if (url.pathname === '/api/research') {
+      if (request.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
+      return handleResearch(request, env);
     }
     // Everything else: serve the static site exactly as before.
     return env.ASSETS.fetch(request);
