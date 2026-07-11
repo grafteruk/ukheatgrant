@@ -1,13 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18066229023"></script>
+  <!-- Google tag, gated behind cookie consent (PECR) — mirrors index.html. -->
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
+    gtag('consent', 'default', {
+      ad_storage: 'denied', ad_user_data: 'denied',
+      ad_personalization: 'denied', analytics_storage: 'denied'
+    });
     gtag('js', new Date());
-    gtag('config', 'AW-18066229023');
+    window.__consentChoice = function () {
+      try {
+        return localStorage.getItem('ukhg_consent') ||
+          (document.cookie.match(/(?:^|; )ukhg_consent=([^;]+)/) || [])[1] || '';
+      } catch (e) { return ''; }
+    };
+    window.__loadGoogleTag = function () {
+      if (window.__gtagLoaded) return;
+      window.__gtagLoaded = true;
+      gtag('consent', 'update', {
+        ad_storage: 'granted', ad_user_data: 'granted',
+        ad_personalization: 'granted', analytics_storage: 'granted'
+      });
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=AW-18066229023';
+      document.head.appendChild(s);
+      gtag('config', 'AW-18066229023');
+    };
+    if (window.__consentChoice() === 'granted') window.__loadGoogleTag();
   </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -37,6 +59,13 @@
     li { font-size: 1rem; color: var(--text-mid); margin-bottom: 0.7rem; }
     a { color: var(--green); text-decoration: underline; }
     .back { display: inline-block; margin-top: 2.5rem; font-size: 0.9rem; color: var(--green); font-weight: 600; text-decoration: none; }
+    .cookie-banner { position: fixed; left: 0; right: 0; bottom: 0; z-index: 200; background: var(--white); border-top: 1px solid var(--border); box-shadow: 0 -4px 20px rgba(0,0,0,0.08); padding: 1rem 1.5rem; }
+    .cookie-inner { max-width: 900px; margin: 0 auto; display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+    .cookie-inner p { font-size: 0.85rem; color: var(--text-mid); line-height: 1.5; flex: 1; min-width: 240px; margin: 0; }
+    .cookie-actions { display: flex; gap: 0.6rem; }
+    .cookie-btn { font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.85rem; padding: 0.65rem 1.4rem; border-radius: 8px; border: 1.5px solid var(--green); cursor: pointer; }
+    .cookie-btn.accept { background: var(--green); color: var(--white); }
+    .cookie-btn.reject { background: var(--white); color: var(--green); }
     footer { background: #0F3D25; padding: 2rem; text-align: center; }
     footer p { color: rgba(255,255,255,0.4); font-size: 0.82rem; margin: 0; }
     footer a { color: rgba(255,255,255,0.6); }
@@ -64,7 +93,7 @@
   </ul>
 
   <h2>Who we share it with</h2>
-  <p>If you submit the main enquiry form, we pass your details to Kairi Heating Solutions, a vetted MCS-certified installer, so they can contact you directly to discuss your enquiry, eligibility and next steps. This is the core purpose of the enquiry, and you agree to it when you submit the form and tick the consent box. We do not pass on the email addresses of "just researching" signups to installers, and we do not sell your details to advertisers or share them for unrelated marketing.</p>
+  <p>If you submit the main enquiry form, we pass your details to a single vetted, MCS-certified installer — currently Kairi Heating Solutions — so they can contact you directly to discuss your enquiry, eligibility and next steps. This is the core purpose of the enquiry, and you agree to it when you submit the form and tick the consent box. We do not pass on the email addresses of "just researching" signups to installers, and we do not sell your details to advertisers or share them for unrelated marketing.</p>
 
   <h2>How we store it</h2>
   <p>When you submit a form, your submission is stored securely on Cloudflare's infrastructure (our website and email provider) so that your enquiry is never lost — even if there is a temporary technical problem delivering it to us. Access to this storage is restricted to us, and it is encrypted in transit and at rest.</p>
@@ -77,12 +106,45 @@
   <p>Under UK GDPR you have the right to access the information we hold about you, to have it corrected or deleted, and to withdraw your consent at any time — including unsubscribing from our emails. To exercise any of these, email <a href="mailto:info@ukheatpumpgrant.co.uk">info@ukheatpumpgrant.co.uk</a>. You also have the right to complain to the Information Commissioner's Office (<a href="https://ico.org.uk" target="_blank" rel="noopener">ico.org.uk</a>).</p>
 
   <h2>Cookies &amp; analytics</h2>
-  <p>This site may use cookies and analytics or advertising tools (such as Google) to measure and improve our advertising.</p>
+  <p>We use Google advertising cookies (Google Ads conversion measurement) to see how well our advertising works — but <strong>only if you accept</strong> in the cookie banner. Until you accept, no Google tags load and no advertising cookies are set; if you reject, the site works exactly the same without them. Your choice is remembered on your device for six months. You can <a href="#" id="cookieReset">change your cookie choice</a> at any time — clicking that link clears your saved choice and shows the banner again.</p>
+  <script>
+    document.getElementById('cookieReset').addEventListener('click', function (e) {
+      e.preventDefault();
+      try { localStorage.removeItem('ukhg_consent'); } catch (err) {}
+      document.cookie = 'ukhg_consent=; Max-Age=0; Path=/; SameSite=Lax; Secure';
+      location.reload();
+    });
+  </script>
 
   <a href="/" class="back">← Back to UK Heat Pump Grant</a>
 </div>
 <footer>
   <p>© 2026 UK Heat Pump Grant · <a href="mailto:info@ukheatpumpgrant.co.uk">info@ukheatpumpgrant.co.uk</a> · This site is not affiliated with the UK Government. We connect homeowners with MCS certified installers.</p>
 </footer>
+<div class="cookie-banner" id="cookieBanner" hidden>
+  <div class="cookie-inner">
+    <p>We'd like to use Google advertising cookies to measure how well our ads work. We only set them if you accept — the site works fully either way.</p>
+    <div class="cookie-actions">
+      <button type="button" class="cookie-btn accept" id="cookieAccept">Accept</button>
+      <button type="button" class="cookie-btn reject" id="cookieReject">Reject</button>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var banner = document.getElementById('cookieBanner');
+  function store(v) {
+    try { localStorage.setItem('ukhg_consent', v); } catch (e) {}
+    try { document.cookie = 'ukhg_consent=' + v + '; Max-Age=15552000; Path=/; SameSite=Lax; Secure'; } catch (e) {}
+  }
+  if (!window.__consentChoice()) banner.hidden = false;
+  document.getElementById('cookieAccept').addEventListener('click', function () {
+    store('granted'); banner.hidden = true; window.__loadGoogleTag();
+  });
+  document.getElementById('cookieReject').addEventListener('click', function () {
+    store('denied'); banner.hidden = true;
+  });
+})();
+</script>
 </body>
 </html>

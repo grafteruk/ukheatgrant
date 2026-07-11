@@ -1,13 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18066229023"></script>
+  <!-- Google tag, gated behind cookie consent (PECR). Consent Mode v2: defaults
+       DENIED; gtag.js is only injected after the visitor accepts, so no Google
+       request fires at all pre-consent. Rejecting keeps the page tag-free. -->
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
+    gtag('consent', 'default', {
+      ad_storage: 'denied', ad_user_data: 'denied',
+      ad_personalization: 'denied', analytics_storage: 'denied'
+    });
     gtag('js', new Date());
-    gtag('config', 'AW-18066229023');
+    window.__consentChoice = function () {
+      try {
+        return localStorage.getItem('ukhg_consent') ||
+          (document.cookie.match(/(?:^|; )ukhg_consent=([^;]+)/) || [])[1] || '';
+      } catch (e) { return ''; }
+    };
+    window.__loadGoogleTag = function () {
+      if (window.__gtagLoaded) return;
+      window.__gtagLoaded = true;
+      gtag('consent', 'update', {
+        ad_storage: 'granted', ad_user_data: 'granted',
+        ad_personalization: 'granted', analytics_storage: 'granted'
+      });
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=AW-18066229023';
+      document.head.appendChild(s);
+      gtag('config', 'AW-18066229023');
+    };
+    if (window.__consentChoice() === 'granted') window.__loadGoogleTag();
   </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -130,6 +154,14 @@
     .next-steps li:last-child { margin-bottom: 0; }
     .form-err { background: #FEECEC; border: 1px solid #F5B5B5; color: #8A1F1F; padding: 0.7rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; display: none; line-height: 1.45; }
     .form-err.show { display: block; }
+    .cookie-banner { position: fixed; left: 0; right: 0; bottom: 0; z-index: 200; background: var(--white); border-top: 1px solid var(--border); box-shadow: 0 -4px 20px rgba(0,0,0,0.08); padding: 1rem 1.5rem; }
+    .cookie-inner { max-width: 900px; margin: 0 auto; display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+    .cookie-inner p { font-size: 0.85rem; color: var(--text-mid); line-height: 1.5; flex: 1; min-width: 240px; margin: 0; }
+    .cookie-inner a { color: var(--green); text-decoration: underline; }
+    .cookie-actions { display: flex; gap: 0.6rem; }
+    .cookie-btn { font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.85rem; padding: 0.65rem 1.4rem; border-radius: 8px; border: 1.5px solid var(--green); cursor: pointer; }
+    .cookie-btn.accept { background: var(--green); color: var(--white); }
+    .cookie-btn.reject { background: var(--white); color: var(--green); }
     footer { background: #0F3D25; padding: 2rem; text-align: center; }
     footer p { color: rgba(255,255,255,0.4); font-size: 0.82rem; }
     footer a { color: rgba(255,255,255,0.5); text-decoration: none; }
@@ -206,7 +238,7 @@
   <div class="form-inner">
     <span class="section-label">Free Eligibility Check</span>
     <h2>Check if you qualify</h2>
-    <p>Enquiries are handled by our MCS-certified installation partner, Kairi Heating Solutions, who will contact you directly to discuss your eligibility and the next steps.</p>
+    <p>Enquiries are handled by our vetted, MCS-certified installation partner, who will contact you directly to discuss your eligibility and the next steps.</p>
     <div style="display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
       <div style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:0.8rem 1.2rem; flex:1; min-width:140px; text-align:center;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.5rem; color:#fff;">100,000+</div>
@@ -295,10 +327,10 @@
             <div class="form-group"><label>Last Name</label><input type="text" name="last_name" placeholder="Smith" autocomplete="family-name" required /></div>
           </div>
           <div class="form-group"><label>Email Address</label><input type="email" name="email" placeholder="john@example.com" autocomplete="email" required /></div>
-          <div class="form-group"><label>Phone Number</label><input type="tel" name="phone" placeholder="07700 900000" pattern="[\d\s]{10,15}" title="Please enter a valid UK phone number" autocomplete="tel" required /></div>
+          <div class="form-group"><label>Phone Number</label><input type="tel" name="phone" placeholder="07700 900000" pattern="[\d\s+()-]{10,17}" title="Please enter a valid UK phone number (07… or +44…)" autocomplete="tel" required /></div>
           <div class="consent">
             <input type="checkbox" name="consent" id="leadConsent" value="yes" required />
-            <label for="leadConsent">I agree that my details will be passed to Kairi Heating Solutions, a vetted MCS-certified heat pump installer, so they can contact me regarding my enquiry to discuss my eligibility and next steps. I've read the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</label>
+            <label for="leadConsent">I agree that my details will be passed to a vetted, MCS-certified heat pump installer, so they can contact me regarding my enquiry to discuss my eligibility and next steps. I've read the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</label>
           </div>
           <button type="submit" class="form-submit" id="submitBtn">Confirm My Eligibility →</button>
         </form>
@@ -357,7 +389,7 @@
           <div class="next-steps">
             <h4>What happens next</h4>
             <ul>
-              <li>Kairi Heating Solutions, our MCS-certified installer, will contact you to discuss your enquiry, eligibility and next steps.</li>
+              <li>Our vetted, MCS-certified installer will contact you to discuss your enquiry, eligibility and next steps.</li>
               <li>They'll arrange a free home survey at a time that suits you — no obligation.</li>
               <li>Your grant paperwork is handled for you, with the £7,500 deducted from your final quote.</li>
             </ul>
@@ -370,6 +402,31 @@
 <footer>
   <p>© 2026 UK Heat Pump Grant · GrafterUK Ltd · Company No. 17303977 · info@ukheatpumpgrant.co.uk · <a href="/privacy">Privacy Policy</a> · This site is not affiliated with the UK Government. We connect homeowners with MCS certified installers.</p>
 </footer>
+<div class="cookie-banner" id="cookieBanner" hidden>
+  <div class="cookie-inner">
+    <p>We'd like to use Google advertising cookies to measure how well our ads work. We only set them if you accept — the site works fully either way. <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a></p>
+    <div class="cookie-actions">
+      <button type="button" class="cookie-btn accept" id="cookieAccept">Accept</button>
+      <button type="button" class="cookie-btn reject" id="cookieReject">Reject</button>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var banner = document.getElementById('cookieBanner');
+  function store(v) {
+    try { localStorage.setItem('ukhg_consent', v); } catch (e) {}
+    try { document.cookie = 'ukhg_consent=' + v + '; Max-Age=15552000; Path=/; SameSite=Lax; Secure'; } catch (e) {}
+  }
+  if (!window.__consentChoice()) banner.hidden = false;
+  document.getElementById('cookieAccept').addEventListener('click', function () {
+    store('granted'); banner.hidden = true; window.__loadGoogleTag();
+  });
+  document.getElementById('cookieReject').addEventListener('click', function () {
+    store('denied'); banner.hidden = true;
+  });
+})();
+</script>
 <script>
 (function () {
   const CONVERSION_SEND_TO = 'AW-18066229023/GOAHCMHB15YcEJ-O06ZD';
@@ -459,13 +516,25 @@
     if (postcodeErr.classList.contains('show')) postcodeErr.classList.remove('show');
   });
 
-  function computeGrade() {
-    const fossil = ['gas', 'oil', 'lpg'].indexOf(answers.heating) !== -1;
-    const premium = ['detached', 'semi-detached', 'bungalow'].indexOf(answers.property_type) !== -1;
-    const urgent = answers.timeline === 'within-3-months';
-    const medium = answers.timeline === '3-6-months' || answers.timeline === '6-12-months';
-    if (fossil && premium && urgent) return 'A';
-    if (medium) return 'B';
+  // Lead grade rubric. Urgency and fossil-fuel replacement demand outrank
+  // timeline alone — an urgent lead must never grade below a slower one.
+  // (Old bug: urgent+fossil+terraced fell through to C while any 3–12-month
+  // lead took B.) "researching" never reaches grading — it exits to the guide.
+  //
+  //   timeline \ profile | fossil+premium | fossil+terraced | electric (any)
+  //   within-3-months    |       A        |        B        |       B
+  //   3–6 / 6–12 months  |       B        |        B        |       C
+  //
+  // fossil = gas/oil/lpg (the BUS core replacement market); premium =
+  // detached/semi/bungalow (better install economics than terraced).
+  function computeGrade(heating, propertyType, timeline) {
+    const fossil = ['gas', 'oil', 'lpg'].indexOf(heating) !== -1;
+    const premium = ['detached', 'semi-detached', 'bungalow'].indexOf(propertyType) !== -1;
+    const urgent = timeline === 'within-3-months';
+    const medium = timeline === '3-6-months' || timeline === '6-12-months';
+    if (fossil && urgent) return premium ? 'A' : 'B';
+    if (fossil && medium) return 'B';
+    if (urgent) return 'B';
     return 'C';
   }
 
@@ -476,7 +545,7 @@
     document.getElementById('h_property').value = answers.property_type || '';
     document.getElementById('h_timeline').value = answers.timeline || '';
     document.getElementById('h_postcode').value = answers.postcode || '';
-    document.getElementById('leadGrade').value = computeGrade();
+    document.getElementById('leadGrade').value = computeGrade(answers.heating, answers.property_type, answers.timeline);
   }
 
   function fireConversion(done) {
@@ -512,7 +581,13 @@
     }
     populateHidden();
     const data = Object.fromEntries(new FormData(form));
-    if (data.phone) data.phone = data.phone.replace(/\s+/g, '');
+    // Normalise UK numbers before storing/sending: +447… / 447… -> 07…
+    if (data.phone) {
+      let p = data.phone.replace(/[\s\-()]/g, '');
+      if (/^\+44\d{9,10}$/.test(p)) p = '0' + p.slice(3);
+      else if (/^44\d{9,10}$/.test(p)) p = '0' + p.slice(2);
+      data.phone = p;
+    }
 
     // reCAPTCHA token for the Worker (single server call now — Web3Forms removed).
     try {
@@ -545,7 +620,7 @@
         ? 'Thanks, ' + firstName + '. Your details have been received.'
         : 'Thank you — your details have been received.';
       document.getElementById('confirmLead').textContent =
-        'A member of the team at Kairi Heating Solutions, our MCS-certified installer, will be in touch shortly to discuss your enquiry, your eligibility, and the next steps.';
+        'A member of the team at our vetted, MCS-certified installation partner will be in touch shortly to discuss your enquiry, your eligibility, and the next steps.';
       fireConversion(function () { advance('confirmed'); });
     } catch (err) {
       console.error('[lead] network error:', err);

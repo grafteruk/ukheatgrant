@@ -2,10 +2,12 @@
   Cloudflare Worker for ukheatpumpgrant.co.uk
   ---------------------------------------------------------------------------
   - Serves the existing static site unchanged, via the ASSETS binding.
-  - POST /api/confirm sends TWO emails via Cloudflare Email Sending (env.EMAIL):
-    the enquirer's branded confirmation and the internal lead notification. Called
-    only by the main lead form on a successful submit. Web3Forms still emails the
-    lead to us as before, in parallel (belt-and-braces on a live revenue site).
+  - POST /api/confirm captures the lead to KV (LEADS, 90-day TTL) then sends TWO
+    emails via Cloudflare Email Sending (env.EMAIL): the enquirer's branded
+    confirmation and the internal lead notification. The Worker is the sole lead
+    path (Web3Forms was removed 2026-07).
+  - POST /api/research captures the "just researching" guide signup to KV and
+    sends its own notification + confirmation pair.
 
   Binding: EMAIL (send_email) — domain ukheatpumpgrant.co.uk onboarded to Email
   Sending. No email API keys. (Migrated off Resend — CF native sending, 2026.)
@@ -184,7 +186,7 @@ function buildNotification(lead) {
     'Consent:         ' + consent,
     'Submitted:       ' + submitted,
     'Source:          ukheatpumpgrant.co.uk — main eligibility form', '',
-    'Sent alongside your Web3Forms notification during the parallel-running period.'
+    'Reply to this email to reach the enquirer directly.'
   ].join('\n');
 
   const row = (l, v) => '<tr><td style="padding:10px 14px;background:#FAFAF8;color:#5d6f80;width:42%;border-bottom:1px solid #EEF2F0;">' + esc(l) + '</td><td style="padding:10px 14px;color:#1A1A1A;font-weight:600;border-bottom:1px solid #EEF2F0;">' + esc(v) + '</td></tr>';
@@ -236,7 +238,7 @@ function buildNotification(lead) {
             '</table>' +
           '</td></tr>' +
           '<tr><td style="padding:14px 32px 26px;font-family:Arial,Helvetica,sans-serif;">' +
-            '<div style="font-size:12px;color:#777;">Sent alongside your Web3Forms notification during the parallel-running period.</div>' +
+            '<div style="font-size:12px;color:#777;">Reply to this email to reach the enquirer directly.</div>' +
           '</td></tr>' +
           '<tr><td style="background:#0F3D25;padding:20px 32px;font-family:Arial,Helvetica,sans-serif;">' +
             '<div style="font-size:13px;color:rgba(255,255,255,0.9);font-weight:700;margin-bottom:7px;">UK Heat Pump Grant</div>' +
@@ -280,8 +282,9 @@ async function handleConfirm(request, env) {
   const notification = buildNotification(data);
   const [confRes, notifRes] = await Promise.allSettled([
     sendMail(env, { to: email, subject: SUBJECT, text: confirmation.text, html: confirmation.html, replyTo: REPLY_TO, tag: 'confirm-email' }),
-    // Reply-To = info@ (leads go to Ben/Kairi; we don't reply to customers directly).
-    sendMail(env, { to: NOTIFY_TO, subject: notification.subject, text: notification.text, html: notification.html, replyTo: REPLY_TO, tag: 'lead-notify' })
+    // Reply-To = the enquirer, so hitting reply on (or forwarding) the lead
+    // notification reaches the customer directly — same pattern as quashed.
+    sendMail(env, { to: NOTIFY_TO, subject: notification.subject, text: notification.text, html: notification.html, replyTo: email, tag: 'lead-notify' })
   ]);
 
   // The lead is safe if it was durably captured (KV) OR the notification emailed.
