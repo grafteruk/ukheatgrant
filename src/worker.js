@@ -12,8 +12,10 @@
   Binding: EMAIL (send_email) — domain ukheatpumpgrant.co.uk onboarded to Email
   Sending. No email API keys. (Migrated off Resend — CF native sending, 2026.)
   Secrets (wrangler secret put, never in code):
-    - RECAPTCHA_SECRET    (optional) if set, /api/confirm verifies the form's
-                          reCAPTCHA v3 token before sending — anti-abuse.
+    - RECAPTCHA_SECRET    REQUIRED — /api/confirm and /api/research verify the
+                          form's reCAPTCHA v3 token and FAIL CLOSED without it.
+  Abuse controls: Origin allowlist + per-IP hourly rate limit (KV) + reCAPTCHA
+  on both submit endpoints.
 */
 
 const SENDER = 'UK Heat Pump Grant <info@ukheatpumpgrant.co.uk>';
@@ -94,6 +96,42 @@ function buildBody(name) {
 
 function isValidEmail(e) {
   return typeof e === 'string' && e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
+
+// Browser-submitted endpoints only accept posts from our own pages. An attacker
+// with curl can spoof Origin, so this specifically stops cross-site browser abuse;
+// reCAPTCHA + the rate limit below cover scripted abuse.
+const ALLOWED_ORIGINS = ['https://ukheatpumpgrant.co.uk', 'https://www.ukheatpumpgrant.co.uk', 'http://localhost:8787'];
+function forbiddenOrigin(request) {
+  return !ALLOWED_ORIGINS.includes(request.headers.get('Origin') || '');
+}
+
+// Per-IP rate limit: N submits per hour bucket. KV is eventually consistent, so
+// this is approximate — the goal is stopping mail-bomb/quota-burn abuse, not
+// precise quotas. Never blocks on KV failure (a real lead beats a perfect limit).
+const RATE_LIMIT_PER_HOUR = 5;
+async function rateLimited(env, endpoint, ip) {
+  if (!ip) return false;
+  try {
+    const bucket = Math.floor(Date.now() / 3600000);
+    const key = `rl:${endpoint}:${ip}:${bucket}`;
+    const n = parseInt(await env.LEADS.get(key), 10) || 0;
+    if (n >= RATE_LIMIT_PER_HOUR) return true;
+    await env.LEADS.put(key, String(n + 1), { expirationTtl: 3600 });
+    return false;
+  } catch (e) { return false; }
+}
+
+// reCAPTCHA is REQUIRED on every email-sending route — FAIL CLOSED when the
+// secret is missing rather than silently skipping verification.
+async function requireRecaptcha(request, env, token) {
+  if (!env.RECAPTCHA_SECRET) {
+    console.error('[config] RECAPTCHA_SECRET missing — refusing submissions (fail closed)');
+    return json({ ok: false, error: 'server_misconfigured' }, 500);
+  }
+  const ok = await verifyRecaptcha(token, env.RECAPTCHA_SECRET, request.headers.get('CF-Connecting-IP'));
+  if (!ok) return json({ ok: false, error: 'verification_failed' }, 403);
+  return null;
 }
 
 async function verifyRecaptcha(token, secret, ip) {
@@ -255,6 +293,11 @@ function buildNotification(lead) {
 }
 
 async function handleConfirm(request, env) {
+  if (forbiddenOrigin(request)) return json({ ok: false, error: 'forbidden_origin' }, 403);
+  if (await rateLimited(env, 'confirm', request.headers.get('CF-Connecting-IP'))) {
+    return json({ ok: false, error: 'rate_limited' }, 429);
+  }
+
   let data;
   try { data = await request.json(); }
   catch (e) { return json({ ok: false, error: 'bad_request' }, 400); }
@@ -263,12 +306,8 @@ async function handleConfirm(request, env) {
   const name = (data && (data.name || data.first_name)) || '';
   if (!isValidEmail(email)) return json({ ok: false, error: 'invalid_email' }, 400);
 
-  // Optional anti-abuse: verify the form's reCAPTCHA token when a secret is set.
-  if (env.RECAPTCHA_SECRET) {
-    const ok = await verifyRecaptcha(
-      data.recaptcha_token, env.RECAPTCHA_SECRET, request.headers.get('CF-Connecting-IP'));
-    if (!ok) return json({ ok: false, error: 'verification_failed' }, 403);
-  }
+  const captchaFail = await requireRecaptcha(request, env, data.recaptcha_token);
+  if (captchaFail) return captchaFail;
 
   // DURABLE CAPTURE FIRST — write the full lead to KV before any email, so a mail
   // outage costs latency, not the lead. (recaptcha_token excluded; it's spent.)
@@ -318,14 +357,17 @@ async function captureLead(env, source, payload) {
 }
 
 async function handleResearch(request, env) {
+  if (forbiddenOrigin(request)) return json({ ok: false, error: 'forbidden_origin' }, 403);
+  if (await rateLimited(env, 'research', request.headers.get('CF-Connecting-IP'))) {
+    return json({ ok: false, error: 'rate_limited' }, 429);
+  }
+
   let d;
   try { d = await request.json(); } catch (e) { return json({ ok: false, error: 'bad_request' }, 400); }
   const email = d && d.email;
   if (!isValidEmail(email)) return json({ ok: false, error: 'invalid_email' }, 400);
-  if (env.RECAPTCHA_SECRET) {
-    const ok = await verifyRecaptcha(d.recaptcha_token, env.RECAPTCHA_SECRET, request.headers.get('CF-Connecting-IP'));
-    if (!ok) return json({ ok: false, error: 'verification_failed' }, 403);
-  }
+  const captchaFail = await requireRecaptcha(request, env, d.recaptcha_token);
+  if (captchaFail) return captchaFail;
   const captured = await captureLead(env, 'heatpump-research', { email });
   const notif = {
     subject: 'New guide signup — ' + email,
