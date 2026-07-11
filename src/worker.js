@@ -1,19 +1,25 @@
+import { guideHtml } from './guide.js';
+
 /*
   Cloudflare Worker for ukheatpumpgrant.co.uk
   ---------------------------------------------------------------------------
   - Serves the existing static site unchanged, via the ASSETS binding.
   - POST /api/confirm captures the lead to KV (LEADS, 90-day TTL) then sends TWO
     emails via Cloudflare Email Sending (env.EMAIL): the enquirer's branded
-    confirmation and the internal lead notification. The Worker is the sole lead
-    path (Web3Forms was removed 2026-07).
+    confirmation (with the guide magic link) and the internal lead notification.
+    The Worker is the sole lead path (Web3Forms was removed 2026-07).
   - POST /api/research captures the "just researching" guide signup to KV and
-    sends its own notification + confirmation pair.
+    delivers the guide magic link + an internal notification.
+  - GET /guide?e&ts&sig serves the heat-pump guide behind a signed, 30-day
+    magic link (HMAC over email|ts with GUIDE_SECRET). Content in src/guide.js.
 
   Binding: EMAIL (send_email) — domain ukheatpumpgrant.co.uk onboarded to Email
   Sending. No email API keys. (Migrated off Resend — CF native sending, 2026.)
   Secrets (wrangler secret put, never in code):
     - RECAPTCHA_SECRET    REQUIRED — /api/confirm and /api/research verify the
                           form's reCAPTCHA v3 token and FAIL CLOSED without it.
+    - GUIDE_SECRET        HMAC key for the /guide magic links (links omitted if unset).
+    - ADMIN_TOKEN         HTTP Basic password for the read-only /admin views.
   Abuse controls: Origin allowlist + per-IP hourly rate limit (KV) + reCAPTCHA
   on both submit endpoints.
 */
@@ -34,18 +40,22 @@ const LABELS = {
   timeline: { 'within-3-months': 'Within 3 months', '3-6-months': '3–6 months', '6-12-months': '6–12 months', 'researching': 'Just researching' }
 };
 
-function buildBody(name) {
+function buildBody(name, guideUrl) {
   const clean = (name || '').trim();
   const greeting = clean ? 'Hi ' + clean + ',' : 'Hi there,';
 
+  const guideText = guideUrl
+    ? ['', 'While you wait, here is your free plain-English guide to the heat pump grant — how it works, who qualifies, and what to expect:', guideUrl]
+    : [];
   const text = [
     greeting,
     '',
     'Thank you for your enquiry through ukheatpumpgrant.co.uk.',
     '',
-    'Your details have been passed to Kairi Heating Solutions, our vetted MCS-certified installation partner. A member of their team will contact you shortly to discuss your enquiry, check your eligibility for available grants, and talk through the next steps.',
+    'Your details have been passed to Kairi Heating Solutions, the vetted MCS-certified installer we currently work with. A member of their team will contact you shortly to discuss your enquiry, check your eligibility for available grants, and talk through the next steps.',
     '',
     'Kairi Heating Solutions is a fully MCS-certified heat pump installer — the certification required to access government grant funding.',
+    ...guideText,
     '',
     'If you have any questions in the meantime, just reply to this email.',
     '',
@@ -70,12 +80,18 @@ function buildBody(name) {
           '<tr><td style="padding:32px 32px 28px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.65;color:#1A1A1A;">' +
             '<p style="margin:0 0 16px;">' + esc(greeting) + '</p>' +
             '<p style="margin:0 0 16px;">Thank you for your enquiry through <a href="https://ukheatpumpgrant.co.uk" style="color:#1A6B3C;font-weight:600;text-decoration:none;">ukheatpumpgrant.co.uk</a>.</p>' +
-            '<p style="margin:0 0 16px;">Your details have been passed to <strong>Kairi Heating Solutions</strong>, our vetted MCS-certified installation partner. A member of their team will contact you shortly to discuss your enquiry, check your eligibility for available grants, and talk through the next steps.</p>' +
+            '<p style="margin:0 0 16px;">Your details have been passed to <strong>Kairi Heating Solutions</strong>, the vetted MCS-certified installer we currently work with. A member of their team will contact you shortly to discuss your enquiry, check your eligibility for available grants, and talk through the next steps.</p>' +
             '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 20px;">' +
               '<tr><td style="background:#F0F7F3;border-left:4px solid #2E8B57;border-radius:6px;padding:14px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1A4A2E;">' +
                 'Kairi Heating Solutions is a fully MCS-certified heat pump installer — the certification required to access government grant funding.' +
               '</td></tr>' +
             '</table>' +
+            (guideUrl
+              ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;"><tr><td style="padding:16px 18px;background:#ffffff;border:1px solid #D4EBE0;border-radius:8px;">' +
+                  '<div style="font-size:14px;color:#1A1A1A;line-height:1.5;margin-bottom:12px;">While you wait, here\'s your free plain-English guide to the grant — how it works, who qualifies, and what to expect.</div>' +
+                  '<a href="' + guideUrl + '" style="display:inline-block;background:#1A6B3C;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Read your free guide &rarr;</a>' +
+                '</td></tr></table>'
+              : '') +
             '<p style="margin:0 0 20px;">If you have any questions in the meantime, just reply to this email.</p>' +
             '<p style="margin:0;">Best regards,<br><strong>The team at ukheatpumpgrant.co.uk</strong></p>' +
           '</td></tr>' +
@@ -316,9 +332,10 @@ async function handleConfirm(request, env) {
   const captured = !!leadKey;
 
   // Two independent sends via Cloudflare Email Sending: the enquirer confirmation
-  // and the internal lead notification to us. allSettled → a failure in one never
-  // blocks the other, and Web3Forms is a separate client-side path, unaffected.
-  const confirmation = buildBody(name);
+  // (with the guide magic link) and the internal lead notification to us.
+  // allSettled → a failure in one never blocks the other.
+  const guideUrl = await buildGuideUrl(env, new URL(request.url).origin, email);
+  const confirmation = buildBody(name, guideUrl);
   const notification = buildNotification(data);
   const [confRes, notifRes] = await Promise.allSettled([
     sendMail(env, { to: email, subject: SUBJECT, text: confirmation.text, html: confirmation.html, replyTo: REPLY_TO, tag: 'confirm-email' }),
@@ -376,6 +393,48 @@ async function captureLead(env, source, payload) {
   } catch (e) { console.error('[kv] lead capture failed', String(e)); return null; }
 }
 
+// --- Guide magic link --------------------------------------------------------
+// A signed, expiring link to the heat-pump guide, included in the confirmation
+// emails. The signature covers email|ts so a link can't be forged or reused for
+// a different address, and expires after 30 days.
+async function hmacHex(secret, msg) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret || ''), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+const GUIDE_TTL = 60 * 60 * 24 * 30; // 30 days
+async function buildGuideUrl(env, origin, email) {
+  if (!env.GUIDE_SECRET || !email) return null;
+  const ts = Math.floor(Date.now() / 1000);
+  const sig = await hmacHex(env.GUIDE_SECRET, email + '|' + ts);
+  return origin + '/guide?e=' + encodeURIComponent(email) + '&ts=' + ts + '&sig=' + sig;
+}
+function guideGatePage(msg) {
+  return new Response(
+    '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;max-width:460px;margin:64px auto;padding:0 20px;text-align:center;color:#1A1A1A;">' +
+    '<div style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#1A6B3C;margin-bottom:16px;">UK Heat Pump Grant</div>' +
+    '<p style="color:#555;line-height:1.6;">' + msg + '</p>' +
+    '<p style="margin-top:20px;"><a href="/#check" style="display:inline-block;background:#1A6B3C;color:#fff;text-decoration:none;font-weight:700;padding:11px 22px;border-radius:8px;">Check your eligibility</a></p></div>',
+    { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
+}
+async function handleGuide(request, env) {
+  const url = new URL(request.url);
+  const e = (url.searchParams.get('e') || '').trim();
+  const ts = parseInt(url.searchParams.get('ts') || '', 10);
+  const sig = url.searchParams.get('sig') || '';
+  if (!env.GUIDE_SECRET || !e || !Number.isFinite(ts) || !sig) {
+    return guideGatePage("This guide link is incomplete. Head back to the site and we'll send you a fresh copy.");
+  }
+  const expect = await hmacHex(env.GUIDE_SECRET, e + '|' + ts);
+  if (!safeEq(sig, expect)) return guideGatePage("This guide link isn't valid.");
+  const age = Math.floor(Date.now() / 1000) - ts;
+  if (age < -300 || age > GUIDE_TTL) {
+    return guideGatePage("This guide link has expired (they last 30 days). Enter your email again and we'll resend it.");
+  }
+  return new Response(guideHtml(), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, no-store' } });
+}
+
 async function handleResearch(request, env) {
   if (forbiddenOrigin(request)) return json({ ok: false, error: 'forbidden_origin' }, 403);
   if (await rateLimited(env, 'research', request.headers.get('CF-Connecting-IP'))) {
@@ -388,16 +447,19 @@ async function handleResearch(request, env) {
   if (!isValidEmail(email)) return json({ ok: false, error: 'invalid_email' }, 400);
   const captchaFail = await requireRecaptcha(request, env, d.recaptcha_token);
   if (captchaFail) return captchaFail;
-  const captured = await captureLead(env, 'heatpump-research', { email });
+  // Record consent server-side (was client-only before) alongside the email.
+  // captureLead returns the KV key (or null) — coerce to a boolean for the response.
+  const captured = !!(await captureLead(env, 'heatpump-research', { email, consent: d.consent === 'yes' || d.consent === true }));
+  const guideUrl = await buildGuideUrl(env, new URL(request.url).origin, email);
   const notif = {
     subject: 'New guide signup — ' + email,
     text: 'New "just researching" guide signup (not a full eligibility lead).\n\nEmail: ' + email + '\nSource: ukheatpumpgrant.co.uk research signup',
     html: greenShell('New guide signup', '<p style="margin:0 0 8px;">Someone signed up for the guide (not a full eligibility lead):</p><p style="margin:0;font-size:18px;font-weight:700;"><a href="mailto:' + email + '" style="color:#1A6B3C;text-decoration:none;">' + email + '</a></p>')
   };
   const conf = {
-    subject: 'Thanks for your interest — UK Heat Pump Grant',
-    text: 'Hi,\n\nThanks for your interest in the heat pump grant scheme. We\'ll be in touch with useful, no-pressure information on grants and what they could mean for your home.\n\nWhen you\'re ready to check your eligibility properly, just head back to ukheatpumpgrant.co.uk.\n\nBest regards,\nThe team at ukheatpumpgrant.co.uk',
-    html: greenShell('Thanks for your interest', '<p style="margin:0 0 14px;">Thanks for your interest in the heat pump grant scheme. We\'ll be in touch with useful, no-pressure information on grants and what they could mean for your home.</p><p style="margin:0 0 14px;">When you\'re ready to check your eligibility properly, just head back to <a href="https://ukheatpumpgrant.co.uk" style="color:#1A6B3C;font-weight:600;text-decoration:none;">ukheatpumpgrant.co.uk</a>.</p><p style="margin:0;">Best regards,<br><strong>The team at ukheatpumpgrant.co.uk</strong></p>')
+    subject: 'Your UK Heat Pump Grant guide',
+    text: 'Hi,\n\nThanks for asking for our plain-English guide to the heat pump grant — here it is:\n\n' + (guideUrl || 'https://ukheatpumpgrant.co.uk') + '\n\nIt covers how the Boiler Upgrade Scheme works, who qualifies, what a heat pump actually costs, and what to expect. When you\'re ready to check your eligibility properly, head back to ukheatpumpgrant.co.uk.\n\nWe won\'t add you to any mailing list — if you\'d like us to delete your details, just reply and ask.\n\nBest regards,\nThe team at ukheatpumpgrant.co.uk',
+    html: greenShell('Your free guide', '<p style="margin:0 0 16px;">Thanks for asking for our plain-English guide to the heat pump grant — here it is:</p>' + (guideUrl ? '<p style="margin:0 0 18px;"><a href="' + guideUrl + '" style="display:inline-block;background:#1A6B3C;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 24px;border-radius:8px;">Read your free guide &rarr;</a></p>' : '') + '<p style="margin:0 0 14px;">It covers how the Boiler Upgrade Scheme works, who qualifies, what a heat pump actually costs, and what to expect. When you\'re ready to check your eligibility properly, just head back to <a href="https://ukheatpumpgrant.co.uk" style="color:#1A6B3C;font-weight:600;text-decoration:none;">ukheatpumpgrant.co.uk</a>.</p><p style="margin:0;color:#6b7280;font-size:13px;">We won\'t add you to any mailing list — if you\'d like us to delete your details, just reply and ask.</p>')
   };
   const [n] = await Promise.allSettled([
     sendMail(env, { to: NOTIFY_TO, subject: notif.subject, text: notif.text, html: notif.html, tag: 'research-notify' }),
@@ -511,6 +573,10 @@ export default {
     if (url.pathname === '/api/research') {
       if (request.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
       return handleResearch(request, env);
+    }
+    if (url.pathname === '/guide') {
+      if (request.method !== 'GET') return json({ ok: false, error: 'method_not_allowed' }, 405);
+      return handleGuide(request, env);
     }
     if (url.pathname === '/admin' || url.pathname === '/admin/billing.csv') {
       return handleAdmin(request, env);

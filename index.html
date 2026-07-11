@@ -376,7 +376,7 @@
               <label for="researchConsent">I'm happy to receive heat pump information and updates by email. I've read the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</label>
             </div>
             <button type="submit" class="form-submit" id="researchBtn">Send me the guide</button>
-            <p class="form-note" id="researchNote" style="margin-top:0.8rem;" role="status" aria-live="polite">We'll never spam you. Unsubscribe anytime.</p>
+            <p class="form-note" id="researchNote" style="margin-top:0.8rem;" role="status" aria-live="polite">We'll email you the guide and won't add you to any mailing list.</p>
           </form>
         </div>
       </div>
@@ -663,7 +663,7 @@
       });
       let out = {}; try { out = await res.json(); } catch (e) { /* non-JSON */ }
       if (res.ok && out.ok) {
-        note.textContent = '✓ Got it — we\'ll be in touch shortly.';
+        note.textContent = '✓ Check your email — your guide is on its way.';
         btn.textContent = 'Sent';
       } else {
         console.error('[research] rejected:', res.status, out);
