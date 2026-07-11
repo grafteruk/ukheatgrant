@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /guide
+
+Sitemap: https://ukheatpumpgrant.co.uk/sitemap.xml
