@@ -307,7 +307,9 @@ function greenShell(label, inner) {
 async function captureLead(env, source, payload) {
   try {
     const key = source + ':' + new Date().toISOString() + ':' + crypto.randomUUID().slice(0, 8);
-    await env.LEADS.put(key, JSON.stringify(Object.assign({}, payload, { capturedAt: new Date().toISOString(), source })));
+    // 90-day auto-expiry backstop: leads are deleted manually once handled, but KV
+    // enforces deletion regardless — keeps the privacy-policy retention promise true.
+    await env.LEADS.put(key, JSON.stringify(Object.assign({}, payload, { capturedAt: new Date().toISOString(), source })), { expirationTtl: 60 * 60 * 24 * 90 });
     return true;
   } catch (e) { console.error('[kv] lead capture failed', String(e)); return false; }
 }
