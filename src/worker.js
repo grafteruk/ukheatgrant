@@ -31,6 +31,20 @@ const SUBJECT = 'Thanks for your heat pump enquiry — Kairi Heating Solutions w
 // Internal lead-notification recipient (fixed — this is us, not the enquirer).
 const NOTIFY_TO = 'info@ukheatpumpgrant.co.uk';
 
+// Lead grade, recomputed SERVER-SIDE from the quiz answers so a spoofed
+// lead_grade in the POST body can't inflate a lead. Mirrors computeGrade in
+// index.html (kept in sync): urgency + fossil-fuel demand outrank timeline alone.
+function computeGrade(heating, propertyType, timeline) {
+  const fossil = ['gas', 'oil', 'lpg'].indexOf(heating) !== -1;
+  const premium = ['detached', 'semi-detached', 'bungalow'].indexOf(propertyType) !== -1;
+  const urgent = timeline === 'within-3-months';
+  const medium = timeline === '3-6-months' || timeline === '6-12-months';
+  if (fossil && urgent) return premium ? 'A' : 'B';
+  if (fossil && medium) return 'B';
+  if (urgent) return 'B';
+  return 'C';
+}
+
 // Maps raw quiz answer codes to human-readable labels for the notification.
 const LABELS = {
   ownership: { yes: 'Yes — owns their home', no: 'No — rents' },
@@ -324,6 +338,10 @@ async function handleConfirm(request, env) {
 
   const captchaFail = await requireRecaptcha(request, env, data.recaptcha_token);
   if (captchaFail) return captchaFail;
+
+  // Recompute the grade server-side (the client value is display/bidding only and
+  // spoofable) so the stored lead, notification, and billing all use a trusted grade.
+  data.lead_grade = computeGrade(data.heating_system, data.property_type, data.timeline);
 
   // DURABLE CAPTURE FIRST — write the full lead to KV before any email, so a mail
   // outage costs latency, not the lead. (recaptcha_token excluded; it's spent.)
