@@ -548,17 +548,22 @@
     document.getElementById('leadGrade').value = computeGrade(answers.heating, answers.property_type, answers.timeline);
   }
 
-  function fireConversion(done) {
+  // Conversion value by lead grade — relative quality weights (not real prices)
+  // so Google's bidding learns lead QUALITY, not just volume.
+  const GRADE_VALUE = { A: 20, B: 10, C: 4 };
+  function fireConversion(grade, done) {
     let fired = false;
     const finish = function () { if (fired) return; fired = true; done(); };
     try {
-      if (typeof gtag === 'function') {
+      if (window.__gtagLoaded && typeof gtag === 'function') {
         gtag('event', 'conversion', {
           'send_to': CONVERSION_SEND_TO,
+          'value': GRADE_VALUE[grade] || GRADE_VALUE.C,
+          'currency': 'GBP',
           'event_callback': finish
         });
       } else {
-        console.warn('[gtag] not available — skipping conversion event');
+        console.warn('[gtag] not loaded (no cookie consent?) — skipping conversion event');
       }
     } catch (e) {
       console.warn('[gtag] error firing conversion:', e);
@@ -621,7 +626,7 @@
         : 'Thank you — your details have been received.';
       document.getElementById('confirmLead').textContent =
         'A member of the team at our vetted, MCS-certified installation partner will be in touch shortly to discuss your enquiry, your eligibility, and the next steps.';
-      fireConversion(function () { advance('confirmed'); });
+      fireConversion(data.lead_grade, function () { advance('confirmed'); });
     } catch (err) {
       console.error('[lead] network error:', err);
       errEl.textContent = 'Network error: ' + (err && err.message ? err.message : 'please check your connection and try again.');

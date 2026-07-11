@@ -312,7 +312,8 @@ async function handleConfirm(request, env) {
   // DURABLE CAPTURE FIRST — write the full lead to KV before any email, so a mail
   // outage costs latency, not the lead. (recaptcha_token excluded; it's spent.)
   const { recaptcha_token, ...lead } = data;
-  const captured = await captureLead(env, 'heatpump-lead', lead);
+  const leadKey = await captureLead(env, 'heatpump-lead', lead);
+  const captured = !!leadKey;
 
   // Two independent sends via Cloudflare Email Sending: the enquirer confirmation
   // and the internal lead notification to us. allSettled → a failure in one never
@@ -325,6 +326,24 @@ async function handleConfirm(request, env) {
     // notification reaches the customer directly — same pattern as quashed.
     sendMail(env, { to: NOTIFY_TO, subject: notification.subject, text: notification.text, html: notification.html, replyTo: email, tag: 'lead-notify' })
   ]);
+
+  // BILLING LEDGER — durable, NO TTL: the commission evidence for multi-month
+  // sales cycles must outlive the lead record's 90-day privacy TTL. Holds only
+  // what an invoice needs (accounting-records retention, not marketing data).
+  try {
+    const now = new Date().toISOString();
+    const forwarded = notifRes.status === 'fulfilled';
+    await env.LEADS.put('billing:heatpump:' + now + ':' + crypto.randomUUID().slice(0, 8), JSON.stringify({
+      lead_ref: leadKey,
+      date: now,
+      name: ((data.first_name || '') + ' ' + (data.last_name || '')).trim() || (data.name || ''),
+      postcode: (data.postcode || '').toUpperCase(),
+      grade: data.lead_grade || '',
+      forwarded_at: forwarded ? now : null,
+      status: forwarded ? 'forwarded' : 'captured_only',
+      job_value: null, commission_due: null,
+    }));
+  } catch (e) { console.error('[billing] ledger write failed', String(e)); }
 
   // The lead is safe if it was durably captured (KV) OR the notification emailed.
   // Only both failing is a true failure the customer should retry.
@@ -346,14 +365,15 @@ function greenShell(label, inner) {
 
 // Durable capture: write a submission to KV before any email is attempted, so a
 // mail-provider outage costs latency, not the lead. Best-effort; never throws.
+// Returns the KV key on success (the lead's reference) or null.
 async function captureLead(env, source, payload) {
   try {
     const key = source + ':' + new Date().toISOString() + ':' + crypto.randomUUID().slice(0, 8);
     // 90-day auto-expiry backstop: leads are deleted manually once handled, but KV
     // enforces deletion regardless — keeps the privacy-policy retention promise true.
     await env.LEADS.put(key, JSON.stringify(Object.assign({}, payload, { capturedAt: new Date().toISOString(), source })), { expirationTtl: 60 * 60 * 24 * 90 });
-    return true;
-  } catch (e) { console.error('[kv] lead capture failed', String(e)); return false; }
+    return key;
+  } catch (e) { console.error('[kv] lead capture failed', String(e)); return null; }
 }
 
 async function handleResearch(request, env) {
@@ -386,6 +406,101 @@ async function handleResearch(request, env) {
   return json({ ok: captured || n.status === 'fulfilled' }, 200);
 }
 
+// ---------------------------------------------------------------------------
+// Admin (read-only) — HTTP Basic auth, user "admin", password = ADMIN_TOKEN.
+// ---------------------------------------------------------------------------
+function safeEq(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let out = 0; for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return out === 0;
+}
+function requireAdmin(request, env) {
+  if (!env.ADMIN_TOKEN) return new Response('Admin is not configured (set the ADMIN_TOKEN secret).', { status: 503 });
+  const got = request.headers.get('Authorization') || '';
+  const expect = 'Basic ' + btoa('admin:' + env.ADMIN_TOKEN);
+  if (!safeEq(got, expect)) {
+    return new Response('Authentication required.', { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="ukheatpumpgrant admin"' } });
+  }
+  return null;
+}
+async function listKeys(env, prefix, max = 2000) {
+  const out = [];
+  let cursor;
+  do {
+    const page = await env.LEADS.list({ prefix, cursor, limit: 1000 });
+    out.push(...page.keys);
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor && out.length < max);
+  return out;
+}
+async function getAll(env, keys) {
+  const out = [];
+  for (const k of keys) {
+    try { const v = JSON.parse(await env.LEADS.get(k.name)); if (v) out.push({ key: k.name, v }); } catch (e) { /* skip */ }
+  }
+  return out;
+}
+const escHtml = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+async function handleAdmin(request, env) {
+  const denied = requireAdmin(request, env);
+  if (denied) return denied;
+  const url = new URL(request.url);
+  const newest = (a, b) => (a.key < b.key ? 1 : -1);
+
+  // CSV export of the billing ledger — the evidence for commission invoicing.
+  if (url.pathname === '/admin/billing.csv') {
+    const bills = (await getAll(env, await listKeys(env, 'billing:heatpump:'))).sort(newest);
+    const csvCell = (s) => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+    const rows = [['lead_ref', 'date', 'name', 'postcode', 'forwarded_at', 'status', 'job_value', 'commission_due'].join(',')];
+    for (const { v } of bills) {
+      rows.push([v.lead_ref, v.date, v.name, v.postcode, v.forwarded_at, v.status, v.job_value, v.commission_due].map(csvCell).join(','));
+    }
+    return new Response(rows.join('\n') + '\n', {
+      headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="heatpump-billing-ledger.csv"', 'Cache-Control': 'private, no-store' },
+    });
+  }
+
+  // /admin — leads, research signups, billing ledger (read-only, newest first).
+  const [leads, research, bills] = await Promise.all([
+    getAll(env, await listKeys(env, 'heatpump-lead:')).then((r) => r.sort(newest).slice(0, 200)),
+    getAll(env, await listKeys(env, 'heatpump-research:')).then((r) => r.sort(newest).slice(0, 200)),
+    getAll(env, await listKeys(env, 'billing:heatpump:')).then((r) => r.sort(newest).slice(0, 200)),
+  ]);
+  const td = '<td style="padding:8px 10px;border-top:1px solid #E0E8E4;">';
+  const table = (headers, rows) =>
+    '<table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 28px;">' +
+    '<tr style="text-align:left;color:#777;font-size:12px;text-transform:uppercase;">' + headers.map((h) => '<th style="padding:0 10px 6px;">' + h + '</th>').join('') + '</tr>' +
+    (rows.join('') || '<tr>' + td + 'none yet</td></tr>') + '</table>';
+  const leadRows = leads.map(({ v }) => '<tr>' +
+    td + escHtml((v.capturedAt || '').slice(0, 16).replace('T', ' ')) + '</td>' +
+    td + escHtml(((v.first_name || '') + ' ' + (v.last_name || '')).trim()) + '</td>' +
+    td + escHtml(v.postcode || '') + '</td>' +
+    td + escHtml(v.phone || '') + '</td>' +
+    td + '<strong>' + escHtml(v.lead_grade || '—') + '</strong></td>' +
+    td + escHtml(v.heating_system || '') + ' / ' + escHtml(v.property_type || '') + ' / ' + escHtml(v.timeline || '') + '</td></tr>');
+  const resRows = research.map(({ v }) => '<tr>' + td + escHtml((v.capturedAt || '').slice(0, 16).replace('T', ' ')) + '</td>' + td + escHtml(v.email || '') + '</td></tr>');
+  const billRows = bills.map(({ v }) => '<tr>' +
+    td + escHtml((v.date || '').slice(0, 10)) + '</td>' +
+    td + escHtml(v.name || '') + '</td>' +
+    td + escHtml(v.postcode || '') + '</td>' +
+    td + escHtml(v.grade || '') + '</td>' +
+    td + escHtml(v.status || '') + '</td>' +
+    td + escHtml(v.job_value == null ? '—' : v.job_value) + '</td>' +
+    td + escHtml(v.commission_due == null ? '—' : v.commission_due) + '</td></tr>');
+  return new Response(
+    '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;max-width:1000px;margin:32px auto;padding:0 20px;color:#1A1A1A;">' +
+    '<h2 style="color:#1A6B3C;">Heat pump leads (' + leads.length + ')</h2>' +
+    table(['Captured', 'Name', 'Postcode', 'Phone', 'Grade', 'Heating / property / timeline'], leadRows) +
+    '<h2 style="color:#1A6B3C;">Research signups (' + research.length + ')</h2>' +
+    table(['Captured', 'Email'], resRows) +
+    '<h2 style="color:#1A6B3C;">Billing ledger (' + bills.length + ') · <a href="/admin/billing.csv" style="font-size:14px;">export CSV</a></h2>' +
+    table(['Date', 'Name', 'Postcode', 'Grade', 'Status', 'Job value', 'Commission'], billRows) +
+    '<p style="color:#999;font-size:12px;">Read-only. Lead records auto-expire after 90 days; the billing ledger never expires (commission evidence).</p></div>',
+    { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, no-store' } });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -396,6 +511,9 @@ export default {
     if (url.pathname === '/api/research') {
       if (request.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
       return handleResearch(request, env);
+    }
+    if (url.pathname === '/admin' || url.pathname === '/admin/billing.csv') {
+      return handleAdmin(request, env);
     }
     // Everything else: serve the static site exactly as before.
     return env.ASSETS.fetch(request);
