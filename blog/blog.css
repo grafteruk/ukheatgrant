@@ -37,6 +37,21 @@ td{padding:.65rem .9rem;border-top:1px solid var(--border);color:var(--text-mid)
 .post-list h2 a{color:var(--text);text-decoration:none}
 .post-list h2 a:hover{color:var(--green)}
 .post-list p{font-size:1rem;color:var(--muted);margin:0}
+/* Shared components for the evergreen explainer/pillar pages (also usable in posts).
+   .callout = the time-limited £9,000 uplift highlight (amber = "new / act-by-date",
+   deliberately distinct from the green .note). .illus = the "illustrative, not a quote"
+   caption that must sit under every cost table. */
+.callout{background:#FFF8EC;border:1px solid #F0D9A8;border-left:4px solid #C08A1E;border-radius:8px;padding:1rem 1.2rem;margin:.4rem 0 1.3rem;font-size:1rem}
+.callout strong{color:#8A6408}
+.illus{font-size:.85rem;color:var(--muted);font-style:italic;margin:-.7rem 0 1.4rem}
+.crumb{font-size:.85rem;color:var(--muted);margin-bottom:1.2rem}
+.crumb a{color:var(--muted);text-decoration:none}
+.crumb a:hover{color:var(--green)}
+.nav-links{display:flex;gap:1.1rem;align-items:center;flex-wrap:wrap}
+.nav-links a{color:var(--text-mid);text-decoration:none;font-size:.9rem;font-weight:500}
+.nav-links a:hover{color:var(--green)}
+.nav-links a.nav-cta{color:#fff}
+@media(max-width:640px){.nav-links{gap:.8rem}.nav-links .hide-sm{display:none}}
 footer{background:#0F3D25;padding:2rem;text-align:center;margin-top:2.5rem}
 footer p{color:rgba(255,255,255,.5);font-size:.8rem;line-height:1.6;max-width:720px;margin:0 auto}
 footer a{color:rgba(255,255,255,.65)}

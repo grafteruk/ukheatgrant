@@ -1,5 +1,6 @@
 .git
 .gitignore
+.claude
 .wrangler
 .assetsignore
 wrangler.jsonc

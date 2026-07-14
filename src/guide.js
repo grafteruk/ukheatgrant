@@ -85,6 +85,7 @@ export function guideHtml() {
     <tr><td>Air-to-air heat pump <span style="color:var(--muted)">(newly eligible in 2026)</span></td><td>£2,500</td></tr>
     <tr><td>Biomass boiler (rural only)</td><td>£5,000</td></tr>
   </table>
+  <div class="note"><strong>New — up to £9,000 for off-gas oil &amp; LPG homes.</strong> From <strong>21 July 2026 to 31 March 2027</strong>, homes off the gas grid that currently heat with oil or LPG can get £9,000 (instead of £7,500) towards an air source or ground source heat pump. It's a time-limited uplift with a fixed end date, so the window matters if this is you.</div>
   <p>The grant is paid directly to your installer, not to you. That means the installer reduces the price they quote you by the grant amount, then claims the money back from Ofgem. You never have to chase the government for the money.</p>
   <div class="note"><strong>How long is it available?</strong> The scheme has been extended more than once and is currently scheduled to run until <strong>2030</strong>. However, funding is allocated in annual budgets, and a given year's pot can be used up before the year ends — so while there's no imminent cliff-edge, it's not something to leave indefinitely either.</div>
 

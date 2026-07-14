@@ -599,6 +599,11 @@ export default {
     if (url.pathname === '/admin' || url.pathname === '/admin/billing.csv') {
       return handleAdmin(request, env);
     }
+    // Never serve dotfiles/dotdirs (e.g. /.claude, /.git, /.env) even if one slips
+    // into the assets manifest — belt-and-suspenders alongside .assetsignore.
+    if (url.pathname.split('/').some((seg) => seg.length > 1 && seg[0] === '.')) {
+      return new Response('Not found', { status: 404 });
+    }
     // Everything else: serve the static site exactly as before.
     return env.ASSETS.fetch(request);
   }
